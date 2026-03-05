@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="THY Commander">
 <meta name="theme-color" content="#E30613">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png?v=2">
+
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>THY Commander</title>
 <style>
@@ -216,6 +216,10 @@ flex-direction:row;align-items:center;gap:12px;}
 padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .pwa-dismiss{background:none;border:none;color:#AEAEB2;font-size:20px;cursor:pointer;padding:0 4px;}
 </style>
+
+<link rel="apple-touch-icon" sizes="192x192" href="icon-thy.png">
+<link rel="apple-touch-icon-precomposed" sizes="192x192" href="icon-thy.png">
+<meta name="msapplication-TileImage" content="icon-thy.png">
 </head>
 <body>
 <div id="sticky-wrap"><div id="topbar">
@@ -1437,5 +1441,23 @@ if ('serviceWorker' in navigator) {
   <button class="pwa-btn" id="pwa-install-btn">Ekle</button>
   <button class="pwa-dismiss" onclick="dismissPWA()">&#215;</button>
 </div>
-</body>
+<script>
+// Generate apple-touch-icon via canvas for iOS
+(function() {
+  try {
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() {
+      var c = document.createElement('canvas');
+      c.width = c.height = 192;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, 192, 192);
+      var dataURL = c.toDataURL('image/png');
+      var links = document.querySelectorAll('link[rel*="apple-touch-icon"]');
+      links.forEach(function(l){ l.href = dataURL; });
+    };
+    img.src = 'icon-192.png?v=3&t=' + Date.now();
+  } catch(e) {}
+})();
+</script></body>
 </html>
