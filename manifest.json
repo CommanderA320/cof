@@ -1,7 +1,7 @@
 {
-  "name": "Commander Operational Flow",
-  "short_name": "COF",
-  "description": "Turkish Airlines Commander Operational Flow — OM Part-A Rev.06",
+  "name": "THY Commander",
+  "short_name": "THY Commander",
+  "description": "Turkish Airlines Commander Operational Flow \u2014 OM Part-A Rev.06",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
