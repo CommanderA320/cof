@@ -1078,9 +1078,9 @@ function _showItemModal(ph,item,type){
       }).join('')+
       '</select></div>'+
       '<div class="modal-field"><label class="modal-lbl">METİN (checklist görünür)</label>'+
-      '<textarea class="modal-textarea" id="m-text" rows="5" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea>'+'<button type="button" onclick="var t=document.getElementById(\"m-text\");t.rows=t.rows+3;" style="width:100%;background:#E5E5EA;border:none;border-radius:0 0 10px 10px;padding:4px;font-size:11px;color:#636366;cursor:pointer;">▼ Uzat</button></div>'+
+      '<textarea class="modal-textarea" id="m-text" style="min-height:80px;" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea></div>'+
       '<div class="modal-field"><label class="modal-lbl">DETAY (genişletme görünümü)</label>'+
-      '<textarea class="modal-textarea" id="m-detail" rows="8" placeholder="Detaylı açıklama..." style="min-height:120px;">'+_esc(item?item.detail||'':'')+'</textarea>'+'<button type="button" onclick="var t=document.getElementById(\"m-detail\");t.rows=t.rows+3;" style="width:100%;background:#E5E5EA;border:none;border-radius:0 0 10px 10px;padding:4px;font-size:11px;color:#636366;cursor:pointer;">▼ Uzat</button></div>';
+      '<textarea class="modal-textarea" id="m-detail" style="min-height:200px;" placeholder="Detaylı açıklama...">'+_esc(item?item.detail||'':'')+'</textarea></div>';
 
     mbody.querySelector('.level-picker').onclick=function(ev){
       var opt=ev.target.closest('[data-lvl]'); if(!opt)return;
@@ -1146,8 +1146,14 @@ function _openModal(title,buildFn){
   document.getElementById('modal-btns').innerHTML='';
   buildFn(document.getElementById('modal-body'),document.getElementById('modal-btns'));
   document.getElementById('edit-modal').className='on';
-  // scroll to top
-  document.querySelector('.modal-body-wrap').scrollTop=0;
+  setTimeout(function(){
+    document.querySelectorAll('#modal-body textarea').forEach(function(ta){
+      ta.style.height='auto';
+      ta.style.height=(ta.scrollHeight+4)+'px';
+      ta.addEventListener('input',function(){ this.style.height='auto'; this.style.height=(this.scrollHeight+4)+'px'; });
+    });
+    document.querySelector('.modal-body-wrap').scrollTop=0;
+  },80);
 }
 function _closeModal(){ document.getElementById('edit-modal').className=''; }
 function modalBgClick(e){ if(e.target.id==='edit-modal') _closeModal(); }
