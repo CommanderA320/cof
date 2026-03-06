@@ -217,6 +217,12 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .doc-storage-fill.warn{background:#FF9500;}
 .doc-storage-fill.danger{background:#FF3B30;}
 
+/* ===== SWIPE DELETE ===== */
+.doc-row-wrap{position:relative;overflow:hidden;border-radius:12px;margin-bottom:8px;}
+.doc-row-del-bg{position:absolute;right:0;top:0;bottom:0;width:80px;background:#FF3B30;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;border-radius:12px;}
+.doc-row{position:relative;transition:transform 0.2s;margin-bottom:0;border-radius:12px;}
+.doc-row.swiped{transform:translateX(-80px);}
+
 /* ===== EDIT MODE ===== */
 #edit-screen{display:none;position:fixed;inset:0;background:#F2F2F7;z-index:500;flex-direction:column;max-width:430px;margin:0 auto;}
 #edit-screen.on{display:flex;}
@@ -517,45 +523,80 @@ function _renderDocManager(){
 
   // Storage bar
   var used = _getStorageUsed();
-  var MAX = 4500000; // ~4.5MB safe limit
+  var MAX = 4500000;
   var pct = Math.min(100, Math.round(used/MAX*100));
   var color = pct > 90 ? 'danger' : pct > 70 ? 'warn' : '';
   var storDiv = document.createElement('div');
-  storDiv.style.cssText = 'padding:4px 4px 12px;';
+  storDiv.style.cssText = 'padding:4px 4px 8px;';
   storDiv.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8E8E93;margin-bottom:4px;"><span>Döküman Depolama</span><span>'+Math.round(used/1024)+' KB / '+Math.round(MAX/1024)+' KB</span></div><div class="doc-storage-bar"><div class="doc-storage-fill '+color+'" style="width:'+pct+'%"></div></div>';
   body.appendChild(storDiv);
+
+  // Header with + New Doc button
+  var docHdr = document.createElement('div');
+  docHdr.className = 'edit-sec-lbl';
+  docHdr.innerHTML = '<span>DÖKÜMANLAR ('+REFERENCES.length+')</span>';
+  var addDocBtn = document.createElement('button');
+  addDocBtn.className = 'e-add-btn red';
+  addDocBtn.textContent = '+ Yeni Döküman';
+  addDocBtn.onclick = function(){ _showNewDocModal(); };
+  docHdr.appendChild(addDocBtn);
+  body.appendChild(docHdr);
 
   REFERENCES.forEach(function(ref){
     var stored = '';
     try{ stored = localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
     var hasDoc = stored.length > 0;
     var progress = _docExtractProgress[ref.code] || '';
+    var refCode = ref.code;
+
+    // Wrap for swipe
+    var wrap = document.createElement('div');
+    wrap.className = 'doc-row-wrap';
+
+    // Delete background
+    var delBg = document.createElement('div');
+    delBg.className = 'doc-row-del-bg';
+    delBg.innerHTML = '🗑';
+    delBg.onclick = function(){
+      if(!confirm(refCode+' dökümanını listeden kaldır?')) return;
+      // Remove from REFERENCES
+      var idx = REFERENCES.findIndex(function(r){ return r.code === refCode; });
+      if(idx > -1) REFERENCES.splice(idx, 1);
+      try{ localStorage.removeItem('doc_text_'+refCode); }catch(e){}
+      _renderDocManager();
+    };
+    wrap.appendChild(delBg);
 
     var row = document.createElement('div');
     row.className = 'doc-row';
-    row.id = 'doc-row-'+ref.code.replace(/[^a-zA-Z0-9]/g,'_');
+    row.id = 'doc-row-'+refCode.replace(/[^a-zA-Z0-9]/g,'_');
+
+    // Swipe logic
+    var startX = 0, isSwiped = false;
+    row.addEventListener('touchstart', function(e){ startX = e.touches[0].clientX; }, {passive:true});
+    row.addEventListener('touchend', function(e){
+      var dx = e.changedTouches[0].clientX - startX;
+      if(dx < -50){ row.classList.add('swiped'); isSwiped=true; }
+      else if(dx > 20){ row.classList.remove('swiped'); isSwiped=false; }
+    }, {passive:true});
 
     var badge = document.createElement('div');
     badge.className = 'doc-code-badge';
     badge.style.background = ref.color;
-    badge.textContent = ref.code;
+    badge.textContent = refCode;
 
     var info = document.createElement('div');
     info.className = 'doc-info';
     info.innerHTML = '<div class="doc-title">'+ref.title+'</div>'
       +(ref.rev?'<div class="doc-meta">'+ref.rev+'</div>':'')
-      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB metin yüklü</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
+      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB yüklü</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
       +(progress?'<div class="doc-progress">'+progress+'</div>':'');
-
-    var status = document.createElement('div');
-    status.className = 'doc-status';
 
     // Hidden file input
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.pdf';
     fileInput.style.display = 'none';
-    var refCode = ref.code;
     fileInput.onchange = function(e){
       var file = e.target.files[0];
       if(!file) return;
@@ -565,25 +606,52 @@ function _renderDocManager(){
     var uploadBtn = document.createElement('button');
     uploadBtn.className = 'doc-upload-btn';
     uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
-    uploadBtn.title = hasDoc ? 'Güncelle' : 'PDF Yükle';
     uploadBtn.onclick = function(){ fileInput.click(); };
 
     row.appendChild(badge);
     row.appendChild(info);
-    if(hasDoc){
-      var delBtn = document.createElement('button');
-      delBtn.className = 'doc-del-btn';
-      delBtn.textContent = '🗑';
-      delBtn.onclick = function(){
-        if(!confirm(refCode+" dökümanını sil?")) return;
-        try{ localStorage.removeItem('doc_text_'+refCode); }catch(e){}
-        _renderDocManager();
-      };
-      row.appendChild(delBtn);
-    }
     row.appendChild(uploadBtn);
     row.appendChild(fileInput);
-    body.appendChild(row);
+    wrap.appendChild(row);
+    body.appendChild(wrap);
+  });
+}
+
+function _showNewDocModal(){
+  _openModal('+ Yeni Döküman', function(mbody, mbtns){
+    mbody.innerHTML =
+      '<div class="modal-field"><label class="modal-lbl">Kısa Kod</label><input class="modal-input" id="nd-code" placeholder="Örn: FCOM, MEL, QRH"></div>'+
+      '<div class="modal-field"><label class="modal-lbl">Başlık</label><input class="modal-input" id="nd-title" placeholder="Döküman adı"></div>'+
+      '<div class="modal-field"><label class="modal-lbl">Revizyon</label><input class="modal-input" id="nd-rev" placeholder="Örn: Rev 5 (opsiyonel)"></div>';
+    var colors = ['#E30613','#FF3B30','#FF9500','#34C759','#007AFF','#5856D6','#636366'];
+    var selColor = colors[0];
+    var colorPicker = document.createElement('div');
+    colorPicker.style.cssText = 'display:flex;gap:8px;padding:8px 0;flex-wrap:wrap;';
+    colors.forEach(function(c){
+      var btn = document.createElement('button');
+      btn.style.cssText = 'width:32px;height:32px;border-radius:8px;border:3px solid '+(c===selColor?'#fff':'transparent')+';background:'+c+';cursor:pointer;';
+      btn.onclick = function(){
+        selColor = c;
+        colorPicker.querySelectorAll('button').forEach(function(b){ b.style.borderColor='transparent'; });
+        btn.style.borderColor = '#fff';
+      };
+      colorPicker.appendChild(btn);
+    });
+    mbody.appendChild(colorPicker);
+
+    var save = _mBtn('primary','Ekle', function(){
+      var code = document.getElementById('nd-code').value.trim();
+      var title = document.getElementById('nd-title').value.trim();
+      var rev = document.getElementById('nd-rev').value.trim();
+      if(!code||!title){ alert('Kod ve Başlık zorunlu.'); return; }
+      if(REFERENCES.find(function(r){ return r.code===code; })){ alert('Bu kod zaten var.'); return; }
+      REFERENCES.push({code:code, title:title, rev:rev, color:selColor});
+      _closeModal();
+      _renderDocManager();
+    });
+    var cancel = _mBtn('secondary','İptal', _closeModal);
+    mbtns.appendChild(save);
+    mbtns.appendChild(cancel);
   });
 }
 
