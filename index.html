@@ -297,7 +297,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
         <div style="font-size:9px;color:#AEAEB2;font-weight:500;margin-top:2px;letter-spacing:0.1px;">Created by Capt. Bahad&#x131;r &Uuml;NSAL &nbsp;&#x2022;&nbsp; v1.0</div>
       </div>
     </div>
-    <div class="om-badge">OM Part-A</div>
+    <div class="om-badge" onclick="openReferences()" style="cursor:pointer;">📚 References</div>
   </div>
   <div id="tabs"></div>
 </div>
@@ -1557,5 +1557,51 @@ _loadData(function(){
   <button class="pwa-dismiss" onclick="dismissPWA()">&#215;</button>
 </div>
 
+<!-- References Modal -->
+<div id="ref-modal" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);" onclick="if(event.target===this)closeReferences()">
+  <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1C1C1E;border-radius:20px 20px 0 0;padding:20px 16px max(env(safe-area-inset-bottom,20px),20px);max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:17px;font-weight:700;color:#fff;">📚 Referans Dökümanlar</div>
+      <button onclick="closeReferences()" style="background:#3A3A3C;border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+    </div>
+    <div id="ref-list"></div>
+  </div>
+</div>
+
+<script>
+var REFERENCES = [
+  {code:'OM Part-A', title:'Operations Manual Part A', rev:'Rev 16', color:'#E30613'},
+  {code:'OM Part-B', title:'Operations Manual Part B (A320)', rev:'EK_10_73_005 Rev 07', color:'#E30613'},
+  {code:'GOM', title:'Ground Operations Manual', rev:'R16 V1', color:'#FF9500'},
+  {code:'SHY-6A', title:'Ticari Hava Taşıma İşletmeleri Yönetmeliği', rev:'Rev 7', color:'#007AFF'},
+  {code:'AML', title:'Aircraft Maintenance Log Prosedürü', rev:'Rev 29', color:'#34C759'},
+  {code:'Dispatch Manual', title:'Dispatch El Kitabı', rev:'Rev 6 V1', color:'#FF9500'},
+  {code:'FCTM', title:'Flight Crew Training Manual', rev:'18 Feb 2026', color:'#E30613'},
+  {code:'MEL', title:'Minimum Equipment List', rev:'Rev 64', color:'#FF3B30'},
+  {code:'QRH', title:'Quick Reference Handbook', rev:'03 Dec 2025', color:'#FF3B30'},
+  {code:'AFM', title:'Aircraft Flight Manual', rev:'04 Feb 2026', color:'#5856D6'},
+  {code:'De-Icing Manual', title:'De-Icing / Anti-Icing El Kitabı', rev:'R15 V0', color:'#007AFF'},
+  {code:'LVO', title:'Low Visibility Operations', rev:'Rev 7', color:'#5856D6'},
+  {code:'FR.73.0001', title:'Aircraft Security Search Procedure', rev:'', color:'#FF9500'},
+];
+
+function openReferences(){
+  var list = document.getElementById('ref-list');
+  list.innerHTML = REFERENCES.map(function(r){
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#2C2C2E;border-radius:12px;margin-bottom:8px;">'+
+      '<div style="background:'+r.color+';border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;">'+r.code+'</div>'+
+      '<div style="flex:1;">'+
+        '<div style="color:#fff;font-size:13px;font-weight:600;">'+r.title+'</div>'+
+        (r.rev ? '<div style="color:#AEAEB2;font-size:11px;margin-top:2px;">'+r.rev+'</div>' : '')+
+      '</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('ref-modal').style.display='block';
+}
+
+function closeReferences(){
+  document.getElementById('ref-modal').style.display='none';
+}
+</script>
 </body>
 </html>
