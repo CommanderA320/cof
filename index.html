@@ -747,6 +747,72 @@ function _getDocContext(){
   return ctx;
 }
 
+// ===== OPEN IN DOCUMENT =====
+function _openInDoc(docCode, ref){
+  var text = '';
+  try{ text = localStorage.getItem('doc_text_'+docCode)||''; }catch(e){}
+
+  if(!text){
+    var refInfo = REFERENCES.find(function(r){ return r.code===docCode; });
+    var title = refInfo ? refInfo.title : docCode;
+    _showInfoModal('📄 '+docCode, title+' henüz yüklenmedi.\n\nEdit Mode → 📄 Dökümanlar sekmesinden PDF yükleyebilirsiniz.');
+    return;
+  }
+
+  if(!ref){
+    _showInfoModal('📄 '+docCode, 'Bu madde için referans numarası belirtilmemiş.');
+    return;
+  }
+
+  // Clean ref for search: remove § and spaces
+  var cleanRef = ref.replace(/[§\s]/g,'').toUpperCase();
+  // Try various search patterns
+  var found = '';
+  var lines = text.split('\n');
+  for(var i=0;i<lines.length;i++){
+    var line = lines[i].replace(/\s/g,'').toUpperCase();
+    if(line.indexOf(cleanRef) > -1){
+      // Grab surrounding context (10 lines before and after)
+      var start = Math.max(0, i-3);
+      var end = Math.min(lines.length-1, i+15);
+      found = lines.slice(start,end).join('\n').trim();
+      break;
+    }
+  }
+
+  // Also try partial match (first part of ref)
+  if(!found && cleanRef.length > 4){
+    var partRef = cleanRef.replace(/[\(\)A-Z]$/,'');
+    for(var j=0;j<lines.length;j++){
+      var ln = lines[j].replace(/\s/g,'').toUpperCase();
+      if(ln.indexOf(partRef) > -1){
+        var s2 = Math.max(0, j-3);
+        var e2 = Math.min(lines.length-1, j+15);
+        found = lines.slice(s2,e2).join('\n').trim();
+        break;
+      }
+    }
+  }
+
+  if(!found){
+    _showInfoModal('📄 '+docCode+' — '+ref, 'Referans "'+ref+'" bu dökümanda bulunamadı.\n\nDökümanda §'+ref.replace(/[§]/g,'')+' arandı.');
+    return;
+  }
+
+  _showInfoModal('📄 '+docCode+' — '+ref, found);
+}
+
+function _showInfoModal(title, text){
+  _openModal(title, function(mbody, mbtns){
+    var pre = document.createElement('div');
+    pre.style.cssText = 'font-size:12px;color:#1C1C1E;line-height:1.7;white-space:pre-wrap;font-family:system-ui;background:#F2F2F7;border-radius:10px;padding:12px;max-height:300px;overflow-y:auto;';
+    pre.textContent = text;
+    mbody.appendChild(pre);
+    var ok = _mBtn('primary','Kapat', _closeModal);
+    mbtns.appendChild(ok);
+  });
+}
+
 function resetToDefault(){
   if(!confirm('Tüm değişiklikler silinip orijinal veriye dönülsün mü?')) return;
   _ls('rm', 'cof_data_v2');
@@ -992,6 +1058,14 @@ function _showItemModal(ph,item,type){
       }).join('')+'</div></div>'+
       '<div class="modal-field"><label class="modal-lbl">REFERANS (örn. 8.1.5.4(A))</label>'+
       '<input class="modal-input" id="m-ref" placeholder="OM Part-A bölümü" value="'+_esc(item?item.ref||'':'')+'"></div>'+
+      '<div class="modal-field"><label class="modal-lbl">KAYNAK DÖKÜMAN</label>'+
+      '<select class="modal-input" id="m-src" style="appearance:auto;">'+
+      '<option value="">-- Seçin --</option>'+
+      REFERENCES.map(function(r){
+        var sel = (item && item.source===r.code) ? ' selected' : '';
+        return '<option value="'+r.code+'"'+sel+'>'+r.code+' — '+r.title+'</option>';
+      }).join('')+
+      '</select></div>'+
       '<div class="modal-field"><label class="modal-lbl">METİN (checklist görünür)</label>'+
       '<textarea class="modal-textarea" id="m-text" rows="3" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea></div>'+
       '<div class="modal-field"><label class="modal-lbl">DETAY (genişletme görünümü)</label>'+
@@ -1007,12 +1081,13 @@ function _showItemModal(ph,item,type){
       var ref=document.getElementById('m-ref').value.trim();
       var text=document.getElementById('m-text').value.trim();
       var detail=document.getElementById('m-detail').value.trim();
+      var src=document.getElementById('m-src').value.trim();
       if(!text){alert('Metin zorunlu.'); return;}
       var arr=type==='prereq'?ph.prereqs:ph.items;
       if(isNew){
-        arr.push({id:ph.id+'_'+type[0]+Date.now(),ref:ref,level:curLevel,text:text,detail:detail});
+        arr.push({id:ph.id+'_'+type[0]+Date.now(),ref:ref,level:curLevel,text:text,detail:detail,source:src});
       } else {
-        item.ref=ref; item.level=curLevel; item.text=text; item.detail=detail;
+        item.ref=ref; item.level=curLevel; item.text=text; item.detail=detail; item.source=src;
       }
       _saveData(); _closeModal(); _renderPhaseDetail(ph);
     });
@@ -1451,7 +1526,14 @@ function buildCard(item,idx,glen,locked,parent){
   var det=document.createElement("div");det.className="detail-sec"+(expanded?" open":"");
   var dtxt=document.createElement("div");dtxt.className="detail-txt";dtxt.textContent=item.detail;
   var dbtns=document.createElement("div");dbtns.className="detail-btns";
-  var db1=document.createElement("button");db1.className="dbtn blue";db1.textContent="Open in OM";
+  var db1=document.createElement("button");db1.className="dbtn blue";
+  var srcLabel = item.source ? "Open in "+item.source : "Open in OM";
+  db1.textContent = srcLabel;
+  db1.onclick = function(){
+    var docCode = item.source || "OM Part-A";
+    var ref = item.ref || "";
+    _openInDoc(docCode, ref);
+  };
   var db2=document.createElement("button");db2.className="dbtn";db2.textContent="Add Note";
   dbtns.appendChild(db1);dbtns.appendChild(db2);
   det.appendChild(dtxt);det.appendChild(dbtns);
