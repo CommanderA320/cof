@@ -408,18 +408,22 @@ function _ghToken(){ return _ls('get','gh_pat')||''; }
 function syncToGitHub(silent){
   var token = _ghToken();
   if(!token){ if(!silent) alert('GitHub token girilmemiş. Ayarlardan ekle.'); return; }
-  var content = btoa(unescape(encodeURIComponent(JSON.stringify({version:'1.0',phases:DATA},null,2))));
-  // First get current SHA
-  fetch('https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE+'?ref='+GITHUB_BRANCH,{
-    headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+  var jsonContent = JSON.stringify({version:'1.0',phases:DATA},null,2);
+  var encoded = btoa(unescape(encodeURIComponent(jsonContent)));
+  var apiBase = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE;
+  var headers = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  // Always fetch fresh SHA
+  fetch(apiBase+'?ref='+GITHUB_BRANCH+'&t='+Date.now(), {headers:headers})
+  .then(function(r){
+    if(!r.ok) throw new Error('SHA fetch failed: '+r.status);
+    return r.json();
   })
-  .then(function(r){return r.json();})
   .then(function(d){
-    var sha = d.sha;
-    return fetch('https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE,{
+    if(!d.sha) throw new Error('SHA not found');
+    return fetch(apiBase,{
       method:'PUT',
-      headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
-      body:JSON.stringify({message:'COF data update',content:content,sha:sha,branch:GITHUB_BRANCH})
+      headers:headers,
+      body:JSON.stringify({message:'COF data update '+new Date().toISOString(),content:encoded,sha:d.sha,branch:GITHUB_BRANCH})
     });
   })
   .then(function(r){return r.json();})
@@ -428,6 +432,7 @@ function syncToGitHub(silent){
       _ls('rm','gh_sync_pending');
       _showSyncBadge('✅ GitHub synced');
     } else {
+      _ls('set','gh_sync_pending','1');
       _showSyncBadge('❌ Sync failed: '+(d.message||'unknown'));
     }
   })
