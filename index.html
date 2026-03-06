@@ -1136,6 +1136,10 @@ function _showAuthModal(ph){
 }
 
 // ===== MODAL HELPERS =====
+function _expandTA(id){
+  var t=document.getElementById(id);
+  if(t) t.rows=(parseInt(t.rows)||3)+3;
+}
 function _openModal(title,buildFn){
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-body').innerHTML='';
