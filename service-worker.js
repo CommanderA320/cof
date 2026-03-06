@@ -1,7 +1,11 @@
-const CACHE_NAME = 'cof-v1.1';
+const CACHE_NAME = 'cof-v1.3';
 const ASSETS = [
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-thy.png',
+  './icon-thy-512.png',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 // Install: cache all assets

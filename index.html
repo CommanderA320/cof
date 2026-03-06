@@ -8,8 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="THY Commander">
 <meta name="theme-color" content="#E30613">
 <link rel="manifest" href="manifest.json">
-
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-thy.png">
 <title>THY Commander</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -204,9 +203,10 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 #apikey-input{flex:1;border:1px solid #FFE082;border-radius:8px;padding:6px 10px;font-size:11px;background:#fff;outline:none;font-family:monospace;}
 #apikey-save{background:#E30613;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
 
+/* ---- PWA INSTALL BANNER ---- */
 #pwa-banner{display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
 width:calc(100% - 32px);max-width:400px;background:#1C1C1E;color:#fff;border-radius:16px;
-padding:14px 16px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,0.3);
+padding:14px 16px;z-index:400;box-shadow:0 8px 32px rgba(0,0,0,0.3);
 flex-direction:row;align-items:center;gap:12px;}
 #pwa-banner.show{display:flex;}
 .pwa-txt{flex:1;}
@@ -216,10 +216,6 @@ flex-direction:row;align-items:center;gap:12px;}
 padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .pwa-dismiss{background:none;border:none;color:#AEAEB2;font-size:20px;cursor:pointer;padding:0 4px;}
 </style>
-
-<link rel="apple-touch-icon" sizes="192x192" href="icon-thy.png">
-<link rel="apple-touch-icon-precomposed" sizes="192x192" href="icon-thy.png">
-<meta name="msapplication-TileImage" content="icon-thy.png">
 </head>
 <body>
 <div id="sticky-wrap"><div id="topbar">
@@ -1298,46 +1294,6 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 });
 
-
-
-// PWA Install prompt
-var deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  deferredPrompt = e;
-  if (!localStorage.getItem('cof_pwa_dismissed')) {
-    document.getElementById('pwa-banner').className = 'show';
-  }
-});
-document.getElementById('pwa-install-btn').addEventListener('click', function() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(function() {
-      deferredPrompt = null;
-      document.getElementById('pwa-banner').className = '';
-    });
-  }
-});
-function dismissPWA() {
-  document.getElementById('pwa-banner').className = '';
-  localStorage.setItem('cof_pwa_dismissed', '1');
-}
-window.addEventListener('appinstalled', function() {
-  document.getElementById('pwa-banner').className = '';
-});
-
-// Register Service Worker for PWA/offline support
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('./service-worker.js')
-      .then(function(reg) {
-        console.log('COF Service Worker registered:', reg.scope);
-      })
-      .catch(function(err) {
-        console.log('Service Worker registration failed:', err);
-      });
-  });
-}
 </script>
 
 <!-- AI FAB BUTTON -->
@@ -1432,32 +1388,65 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
-
+<!-- PWA INSTALL BANNER -->
 <div id="pwa-banner">
   <div class="pwa-txt">
     <div class="pwa-title">&#128268; Ana Ekrana Ekle</div>
-    <div class="pwa-sub">COF'u uygulama olarak kullanın — offline çalışır</div>
+    <div class="pwa-sub">THY Commander'ı uygulama olarak kullanın — offline çalışır</div>
   </div>
   <button class="pwa-btn" id="pwa-install-btn">Ekle</button>
   <button class="pwa-dismiss" onclick="dismissPWA()">&#215;</button>
 </div>
+
 <script>
-// Generate apple-touch-icon via canvas for iOS
-(function() {
-  try {
-    var img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = function() {
-      var c = document.createElement('canvas');
-      c.width = c.height = 192;
-      var ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0, 192, 192);
-      var dataURL = c.toDataURL('image/png');
-      var links = document.querySelectorAll('link[rel*="apple-touch-icon"]');
-      links.forEach(function(l){ l.href = dataURL; });
-    };
-    img.src = 'icon-192.png?v=3&t=' + Date.now();
-  } catch(e) {}
-})();
-</script></body>
+// PWA Install prompt — inside DOMContentLoaded to ensure elements exist
+document.addEventListener('DOMContentLoaded', function() {
+  var deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (!localStorage.getItem('cof_pwa_dismissed')) {
+      document.getElementById('pwa-banner').className = 'show';
+    }
+  });
+
+  var installBtn = document.getElementById('pwa-install-btn');
+  if (installBtn) {
+    installBtn.addEventListener('click', function() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function() {
+          deferredPrompt = null;
+          document.getElementById('pwa-banner').className = '';
+        });
+      }
+    });
+  }
+
+  window.addEventListener('appinstalled', function() {
+    document.getElementById('pwa-banner').className = '';
+  });
+});
+
+function dismissPWA() {
+  document.getElementById('pwa-banner').className = '';
+  localStorage.setItem('cof_pwa_dismissed', '1');
+}
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(function(reg) {
+        console.log('THY Commander SW registered:', reg.scope);
+      })
+      .catch(function(err) {
+        console.warn('SW registration failed:', err);
+      });
+  });
+}
+</script>
+
+</body>
 </html>

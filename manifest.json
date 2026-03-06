@@ -1,7 +1,7 @@
 {
   "name": "THY Commander",
   "short_name": "THY Commander",
-  "description": "Turkish Airlines Commander Operational Flow \u2014 OM Part-A Rev.06",
+  "description": "Turkish Airlines Commander Operational Flow — OM Part-A Rev.06",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
@@ -13,13 +13,25 @@
       "src": "icon-thy.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-thy.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "icon-thy-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-thy-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
