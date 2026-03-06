@@ -1077,9 +1077,9 @@ function _showItemModal(ph,item,type){
       }).join('')+
       '</select></div>'+
       '<div class="modal-field"><label class="modal-lbl">METİN (checklist görünür)</label>'+
-      '<textarea class="modal-textarea" id="m-text" rows="3" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea></div>'+
+      '<textarea class="modal-textarea" id="m-text" rows="5" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea></div>'+
       '<div class="modal-field"><label class="modal-lbl">DETAY (genişletme görünümü)</label>'+
-      '<textarea class="modal-textarea" id="m-detail" rows="3" placeholder="Detaylı açıklama...">'+_esc(item?item.detail||'':'')+'</textarea></div>';
+      '<textarea class="modal-textarea" id="m-detail" rows="8" placeholder="Detaylı açıklama...">'+_esc(item?item.detail||'':'')+'</textarea></div>';
 
     mbody.querySelector('.level-picker').onclick=function(ev){
       var opt=ev.target.closest('[data-lvl]'); if(!opt)return;
