@@ -764,42 +764,51 @@ function _openInDoc(docCode, ref){
     return;
   }
 
-  // Clean ref for search: remove § and spaces
-  var cleanRef = ref.replace(/[§\s]/g,'').toUpperCase();
-  // Try various search patterns
-  var found = '';
-  var lines = text.split('\n');
-  for(var i=0;i<lines.length;i++){
-    var line = lines[i].replace(/\s/g,'').toUpperCase();
-    if(line.indexOf(cleanRef) > -1){
-      // Grab surrounding context (10 lines before and after)
-      var start = Math.max(0, i-3);
-      var end = Math.min(lines.length-1, i+15);
-      found = lines.slice(start,end).join('\n').trim();
-      break;
+  // Search helper
+  function _searchInText(txt, ref){
+    var cleanRef = ref.replace(/[§\s]/g,'').toUpperCase();
+    var lines = txt.split('\n');
+    for(var i=0;i<lines.length;i++){
+      if(lines[i].replace(/\s/g,'').toUpperCase().indexOf(cleanRef) > -1){
+        var s=Math.max(0,i-3), e=Math.min(lines.length-1,i+15);
+        return lines.slice(s,e).join('\n').trim();
+      }
     }
+    // partial match
+    if(cleanRef.length > 4){
+      var part = cleanRef.replace(/[\(\)[A-Z]$/,'');
+      for(var j=0;j<lines.length;j++){
+        if(lines[j].replace(/\s/g,'').toUpperCase().indexOf(part) > -1){
+          var s2=Math.max(0,j-3), e2=Math.min(lines.length-1,j+15);
+          return lines.slice(s2,e2).join('\n').trim();
+        }
+      }
+    }
+    return '';
   }
 
-  // Also try partial match (first part of ref)
-  if(!found && cleanRef.length > 4){
-    var partRef = cleanRef.replace(/[\(\)A-Z]$/,'');
-    for(var j=0;j<lines.length;j++){
-      var ln = lines[j].replace(/\s/g,'').toUpperCase();
-      if(ln.indexOf(partRef) > -1){
-        var s2 = Math.max(0, j-3);
-        var e2 = Math.min(lines.length-1, j+15);
-        found = lines.slice(s2,e2).join('\n').trim();
-        break;
-      }
+  var found = _searchInText(text, ref);
+  var foundDoc = docCode;
+
+  // If not found in specified doc, search ALL loaded docs
+  if(!found){
+    for(var ri=0; ri<REFERENCES.length; ri++){
+      if(REFERENCES[ri].code === docCode) continue;
+      var altText = '';
+      try{ altText = localStorage.getItem('doc_text_'+REFERENCES[ri].code)||''; }catch(e){}
+      if(!altText) continue;
+      var altFound = _searchInText(altText, ref);
+      if(altFound){ found = altFound; foundDoc = REFERENCES[ri].code; break; }
     }
   }
 
   if(!found){
-    _showInfoModal('📄 '+docCode+' — '+ref, 'Referans "'+ref+'" bu dökümanda bulunamadı.\n\nDökümanda §'+ref.replace(/[§]/g,'')+' arandı.');
+    _showInfoModal('📄 '+ref, 'Referans "'+ref+'" yüklü hiçbir dökümanda bulunamadı.\n\nİpucu: İlgili PDF\'i Dökümanlar sekmesinden yükleyin.');
     return;
   }
 
-  _showInfoModal('📄 '+docCode+' — '+ref, found);
+  var prefix = foundDoc !== docCode ? '('+docCode+' yerine '+foundDoc+' içinde bulundu)\n\n' : '';
+  _showInfoModal('📄 '+foundDoc+' — '+ref, prefix+found);
 }
 
 function _showInfoModal(title, text){
