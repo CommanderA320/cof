@@ -202,6 +202,21 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 #apikey-input{flex:1;border:1px solid #FFE082;border-radius:8px;padding:6px 10px;font-size:11px;background:#fff;outline:none;font-family:monospace;}
 #apikey-save{background:#E30613;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
 
+/* ===== DOC MANAGER ===== */
+.doc-row{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.doc-code-badge{border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;flex-shrink:0;}
+.doc-info{flex:1;min-width:0;}
+.doc-title{font-size:13px;font-weight:600;color:#1C1C1E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.doc-meta{font-size:11px;color:#8E8E93;margin-top:2px;}
+.doc-status{font-size:18px;flex-shrink:0;}
+.doc-upload-btn{background:#007AFF;color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.doc-del-btn{background:#FF3B30;color:#fff;border:none;border-radius:8px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.doc-progress{font-size:10px;color:#007AFF;margin-top:3px;font-weight:600;}
+.doc-storage-bar{background:#E5E5EA;border-radius:6px;height:6px;margin:8px 4px 4px;overflow:hidden;}
+.doc-storage-fill{background:#34C759;height:6px;border-radius:6px;transition:width 0.3s;}
+.doc-storage-fill.warn{background:#FF9500;}
+.doc-storage-fill.danger{background:#FF3B30;}
+
 /* ===== EDIT MODE ===== */
 #edit-screen{display:none;position:fixed;inset:0;background:#F2F2F7;z-index:500;flex-direction:column;max-width:430px;margin:0 auto;}
 #edit-screen.on{display:flex;}
@@ -467,6 +482,201 @@ function saveGHToken(){
 function openGHSettings(){
   var s=document.getElementById('gh-settings');
   if(s) s.style.display=s.style.display==='none'?'flex':'none';
+}
+
+// ===== EDIT TAB SWITCHING =====
+var _editTab = 'phases';
+function switchEditTab(tab){
+  _editTab = tab;
+  document.getElementById('etab-phases').style.borderBottomColor = tab==='phases'?'#E30613':'transparent';
+  document.getElementById('etab-phases').style.opacity = tab==='phases'?'1':'0.5';
+  document.getElementById('etab-docs').style.borderBottomColor = tab==='docs'?'#E30613':'transparent';
+  document.getElementById('etab-docs').style.opacity = tab==='docs'?'1':'0.5';
+  // hide footer in docs tab
+  document.querySelector('.edit-footer').style.display = tab==='docs'?'none':'flex';
+  if(tab==='docs') _renderDocManager();
+  else _renderEditView();
+}
+
+// ===== DOCUMENT MANAGER =====
+var _docExtractProgress = {};
+
+function _getStorageUsed(){
+  var total = 0;
+  try{
+    for(var k in localStorage){
+      if(k.startsWith('doc_text_')) total += (localStorage[k]||'').length;
+    }
+  }catch(e){}
+  return total;
+}
+
+function _renderDocManager(){
+  var body = document.getElementById('edit-body');
+  body.innerHTML = '';
+
+  // Storage bar
+  var used = _getStorageUsed();
+  var MAX = 4500000; // ~4.5MB safe limit
+  var pct = Math.min(100, Math.round(used/MAX*100));
+  var color = pct > 90 ? 'danger' : pct > 70 ? 'warn' : '';
+  var storDiv = document.createElement('div');
+  storDiv.style.cssText = 'padding:4px 4px 12px;';
+  storDiv.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8E8E93;margin-bottom:4px;"><span>Döküman Depolama</span><span>'+Math.round(used/1024)+' KB / '+Math.round(MAX/1024)+' KB</span></div><div class="doc-storage-bar"><div class="doc-storage-fill '+color+'" style="width:'+pct+'%"></div></div>';
+  body.appendChild(storDiv);
+
+  REFERENCES.forEach(function(ref){
+    var stored = '';
+    try{ stored = localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
+    var hasDoc = stored.length > 0;
+    var progress = _docExtractProgress[ref.code] || '';
+
+    var row = document.createElement('div');
+    row.className = 'doc-row';
+    row.id = 'doc-row-'+ref.code.replace(/[^a-zA-Z0-9]/g,'_');
+
+    var badge = document.createElement('div');
+    badge.className = 'doc-code-badge';
+    badge.style.background = ref.color;
+    badge.textContent = ref.code;
+
+    var info = document.createElement('div');
+    info.className = 'doc-info';
+    info.innerHTML = '<div class="doc-title">'+ref.title+'</div>'
+      +(ref.rev?'<div class="doc-meta">'+ref.rev+'</div>':'')
+      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB metin yüklü</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
+      +(progress?'<div class="doc-progress">'+progress+'</div>':'');
+
+    var status = document.createElement('div');
+    status.className = 'doc-status';
+
+    // Hidden file input
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.pdf';
+    fileInput.style.display = 'none';
+    var refCode = ref.code;
+    fileInput.onchange = function(e){
+      var file = e.target.files[0];
+      if(!file) return;
+      _extractPDF(file, refCode);
+    };
+
+    var uploadBtn = document.createElement('button');
+    uploadBtn.className = 'doc-upload-btn';
+    uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
+    uploadBtn.title = hasDoc ? 'Güncelle' : 'PDF Yükle';
+    uploadBtn.onclick = function(){ fileInput.click(); };
+
+    row.appendChild(badge);
+    row.appendChild(info);
+    if(hasDoc){
+      var delBtn = document.createElement('button');
+      delBtn.className = 'doc-del-btn';
+      delBtn.textContent = '🗑';
+      delBtn.onclick = function(){
+        if(!confirm(refCode+" dökümanını sil?")) return;
+        try{ localStorage.removeItem('doc_text_'+refCode); }catch(e){}
+        _renderDocManager();
+      };
+      row.appendChild(delBtn);
+    }
+    row.appendChild(uploadBtn);
+    row.appendChild(fileInput);
+    body.appendChild(row);
+  });
+}
+
+function _loadPDFjs(cb){
+  if(typeof pdfjsLib !== 'undefined'){ cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  s.onload = function(){
+    try{ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+    cb();
+  };
+  s.onerror = function(){ cb(new Error('PDF.js yüklenemedi')); };
+  document.head.appendChild(s);
+}
+
+function _extractPDF(file, docCode){
+  _docExtractProgress[docCode] = '⏳ PDF.js yükleniyor...';
+  _renderDocManager();
+  _loadPDFjs(function(err){
+    if(err){
+      _docExtractProgress[docCode] = '❌ ' + err.message + '. İnternet bağlantısı gerekli.';
+      _renderDocManager(); return;
+    }
+    _docExtractProgress[docCode] = '⏳ PDF okunuyor...';
+    _renderDocManager();
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var typedArray = new Uint8Array(e.target.result);
+    pdfjsLib.getDocument({data: typedArray}).promise.then(function(pdf){
+      var totalPages = pdf.numPages;
+      var texts = [];
+      var pageNum = 1;
+
+      function getPage(){
+        if(pageNum > totalPages){
+          var fullText = texts.join('\n');
+          var MAX = 4500000;
+          var used = _getStorageUsed();
+          // subtract existing if updating
+          try{ used -= (localStorage.getItem('doc_text_'+docCode)||'').length; }catch(e){}
+          if(used + fullText.length > MAX){
+            var allowed = MAX - used;
+            if(allowed < 10000){
+              _docExtractProgress[docCode] = '❌ Depolama dolu! Önce başka döküman sil.';
+              _renderDocManager(); return;
+            }
+            fullText = fullText.substring(0, allowed);
+            _docExtractProgress[docCode] = '⚠️ Alan yetersiz, '+Math.round(allowed/1024)+'KB alındı';
+          } else {
+            _docExtractProgress[docCode] = '';
+          }
+          try{
+            localStorage.setItem('doc_text_'+docCode, fullText);
+          }catch(e){
+            _docExtractProgress[docCode] = '❌ Kaydetme hatası: '+e.message;
+            _renderDocManager(); return;
+          }
+          _renderDocManager();
+          return;
+        }
+        _docExtractProgress[docCode] = '⏳ Sayfa '+pageNum+' / '+totalPages;
+        if(pageNum % 10 === 1) _renderDocManager();
+        pdf.getPage(pageNum).then(function(page){
+          page.getTextContent().then(function(tc){
+            var pageText = tc.items.map(function(i){return i.str;}).join(' ');
+            texts.push('=== Sayfa '+pageNum+' ===\n'+pageText);
+            pageNum++;
+            getPage();
+          });
+        });
+      }
+      getPage();
+    }).catch(function(err){
+      _docExtractProgress[docCode] = '❌ PDF okunamadı: '+err.message;
+      _renderDocManager();
+    });
+  };
+  reader.readAsArrayBuffer(file);
+  }); // end _loadPDFjs
+}
+
+// Build document context for AI
+function _getDocContext(){
+  var ctx = '';
+  REFERENCES.forEach(function(ref){
+    var text = '';
+    try{ text = localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
+    if(text.length > 0){
+      ctx += '\n\n=== '+ref.code+': '+ref.title+' ('+ref.rev+') ===\n'+text;
+    }
+  });
+  return ctx;
 }
 
 function resetToDefault(){
@@ -821,6 +1031,22 @@ document.addEventListener('DOMContentLoaded',function(){
 
 var EMOJIS={clipboard:"clipboard",fuel:"fuel",snow:"snow",people:"people","plane-up":"plane-up",plane:"plane","plane-dn":"plane-dn",check:"check"};
 var EMOJI_CHARS={clipboard:"&#128203;",fuel:"&#9981;",snow:"&#10052;",people:"&#128101;","plane-up":"&#128747;",plane:"&#9992;","plane-dn":"&#128748;",check:"&#9989;"};
+var REFERENCES = [
+  {code:'OM Part-A', title:'Operations Manual Part A', rev:'Rev 16', color:'#E30613'},
+  {code:'OM Part-B', title:'Operations Manual Part B (A320)', rev:'EK_10_73_005 Rev 07', color:'#E30613'},
+  {code:'GOM', title:'Ground Operations Manual', rev:'R16 V1', color:'#FF9500'},
+  {code:'SHY-6A', title:'Ticari Hava Taşıma İşletmeleri Yönetmeliği', rev:'Rev 7', color:'#007AFF'},
+  {code:'AML', title:'Aircraft Maintenance Log Prosedürü', rev:'Rev 29', color:'#34C759'},
+  {code:'Dispatch Manual', title:'Dispatch El Kitabı', rev:'Rev 6 V1', color:'#FF9500'},
+  {code:'FCTM', title:'Flight Crew Training Manual', rev:'18 Feb 2026', color:'#E30613'},
+  {code:'MEL', title:'Minimum Equipment List', rev:'Rev 64', color:'#FF3B30'},
+  {code:'QRH', title:'Quick Reference Handbook', rev:'03 Dec 2025', color:'#FF3B30'},
+  {code:'AFM', title:'Aircraft Flight Manual', rev:'04 Feb 2026', color:'#5856D6'},
+  {code:'De-Icing Manual', title:'De-Icing / Anti-Icing El Kitabı', rev:'R15 V0', color:'#007AFF'},
+  {code:'LVO', title:'Low Visibility Operations', rev:'Rev 7', color:'#5856D6'},
+  {code:'FR.73.0001', title:'Aircraft Security Search Procedure', rev:'', color:'#FF9500'},
+];
+
 var ap=0, xi=null, bi=null, CK={}, CT={}, CP={};
 
 function utcNow(){var n=new Date();return ("0"+n.getUTCHours()).slice(-2)+":"+("0"+n.getUTCMinutes()).slice(-2);}
@@ -1355,7 +1581,7 @@ function sendQuery() {
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 1000,
-      system: AI_SYSTEM,
+      system: AI_SYSTEM + (_getDocContext() ? "\n\n=== LOADED REFERENCE DOCUMENTS ===\nThe following documents have been loaded and should be your PRIMARY source for answers. Cite specific section numbers and page references when possible.\n" + _getDocContext() : ""),
       messages: [{
         role: "user",
         content: "AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\nREFERENCE DOCUMENTS: OM Part-A, A320 FCOM, MEL, IATA DGR, W&B Manual, EASA CAT.OP.MPA, ICAO Annex 6\n\nCOMMANDER SCENARIO QUERY:\n" + input
@@ -1519,6 +1745,10 @@ _loadData(function(){
     <div class="edit-topbar-title" id="edit-topbar-title">EDIT MODE</div>
     <div class="edit-admin-badge">ADMIN</div>
   </div>
+  <div id="edit-tabs" style="display:flex;background:#1C1C1E;border-bottom:1px solid #3A3A3C;">
+    <button id="etab-phases" onclick="switchEditTab('phases')" style="flex:1;background:none;border:none;color:#fff;padding:10px 0;font-size:12px;font-weight:700;cursor:pointer;border-bottom:2px solid #E30613;opacity:1;">📋 Phases</button>
+    <button id="etab-docs" onclick="switchEditTab('docs')" style="flex:1;background:none;border:none;color:#fff;padding:10px 0;font-size:12px;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;opacity:0.5;">📄 Dökümanlar</button>
+  </div>
   <div class="edit-body" id="edit-body"></div>
   <div class="edit-footer">
     <button class="edit-foot-btn export" onclick="exportJSON()">&#8595; Export</button>
@@ -1569,31 +1799,21 @@ _loadData(function(){
 </div>
 
 <script>
-var REFERENCES = [
-  {code:'OM Part-A', title:'Operations Manual Part A', rev:'Rev 16', color:'#E30613'},
-  {code:'OM Part-B', title:'Operations Manual Part B (A320)', rev:'EK_10_73_005 Rev 07', color:'#E30613'},
-  {code:'GOM', title:'Ground Operations Manual', rev:'R16 V1', color:'#FF9500'},
-  {code:'SHY-6A', title:'Ticari Hava Taşıma İşletmeleri Yönetmeliği', rev:'Rev 7', color:'#007AFF'},
-  {code:'AML', title:'Aircraft Maintenance Log Prosedürü', rev:'Rev 29', color:'#34C759'},
-  {code:'Dispatch Manual', title:'Dispatch El Kitabı', rev:'Rev 6 V1', color:'#FF9500'},
-  {code:'FCTM', title:'Flight Crew Training Manual', rev:'18 Feb 2026', color:'#E30613'},
-  {code:'MEL', title:'Minimum Equipment List', rev:'Rev 64', color:'#FF3B30'},
-  {code:'QRH', title:'Quick Reference Handbook', rev:'03 Dec 2025', color:'#FF3B30'},
-  {code:'AFM', title:'Aircraft Flight Manual', rev:'04 Feb 2026', color:'#5856D6'},
-  {code:'De-Icing Manual', title:'De-Icing / Anti-Icing El Kitabı', rev:'R15 V0', color:'#007AFF'},
-  {code:'LVO', title:'Low Visibility Operations', rev:'Rev 7', color:'#5856D6'},
-  {code:'FR.73.0001', title:'Aircraft Security Search Procedure', rev:'', color:'#FF9500'},
-];
 
 function openReferences(){
   var list = document.getElementById('ref-list');
   list.innerHTML = REFERENCES.map(function(r){
+    var stored = '';
+    try{ stored = localStorage.getItem('doc_text_'+r.code)||''; }catch(e){}
+    var hasDoc = stored.length > 0;
     return '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#2C2C2E;border-radius:12px;margin-bottom:8px;">'+
       '<div style="background:'+r.color+';border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;">'+r.code+'</div>'+
       '<div style="flex:1;">'+
         '<div style="color:#fff;font-size:13px;font-weight:600;">'+r.title+'</div>'+
         (r.rev ? '<div style="color:#AEAEB2;font-size:11px;margin-top:2px;">'+r.rev+'</div>' : '')+
+        (hasDoc ? '<div style="color:#34C759;font-size:11px;margin-top:2px;">✅ AI\'a yüklü — '+Math.round(stored.length/1024)+' KB</div>' : '<div style="color:#FF9500;font-size:11px;margin-top:2px;">⚠️ AI\'a yüklenmedi</div>')+
       '</div>'+
+      '<div style="font-size:20px;">'+(hasDoc?'✅':'📋')+'</div>'+
     '</div>';
   }).join('');
   document.getElementById('ref-modal').style.display='block';
