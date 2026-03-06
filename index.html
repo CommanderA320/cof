@@ -368,9 +368,27 @@ function _loadData(cb) {
 
 function _saveData(){
   _ls('set', 'cof_data_v2', JSON.stringify({phases:DATA}));
-  // Auto sync to GitHub if token exists
-  if(_ghToken()) syncToGitHub(true);
+  if(_ghToken()){
+    if(navigator.onLine){
+      syncToGitHub(true);
+    } else {
+      // Mark as pending sync
+      _ls('set','gh_sync_pending','1');
+      _showSyncBadge('⏳ Offline — sync bekliyor');
+    }
+  }
 }
+
+// Auto retry when back online
+window.addEventListener('online', function(){
+  if(_ghToken() && _ls('get','gh_sync_pending')==='1'){
+    _showSyncBadge('🔄 Bağlantı geldi, sync yapılıyor...');
+    setTimeout(function(){
+      syncToGitHub(true);
+      _ls('rm','gh_sync_pending');
+    }, 1500);
+  }
+});
 
 function exportJSON(){
   var blob = new Blob([JSON.stringify({version:'1.0',phases:DATA},null,2)],{type:'application/json'});
@@ -407,13 +425,16 @@ function syncToGitHub(silent){
   .then(function(r){return r.json();})
   .then(function(d){
     if(d.content){
-      if(!silent) _showSyncBadge('✅ GitHub synced');
-      else _showSyncBadge('✅ GitHub synced');
+      _ls('rm','gh_sync_pending');
+      _showSyncBadge('✅ GitHub synced');
     } else {
-      _showSyncBadge('❌ Sync failed');
+      _showSyncBadge('❌ Sync failed: '+(d.message||'unknown'));
     }
   })
-  .catch(function(e){ _showSyncBadge('❌ '+e.message); });
+  .catch(function(e){
+    _ls('set','gh_sync_pending','1');
+    _showSyncBadge('❌ '+e.message);
+  });
 }
 
 function _showSyncBadge(msg){
