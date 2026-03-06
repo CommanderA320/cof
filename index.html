@@ -1078,9 +1078,9 @@ function _showItemModal(ph,item,type){
       }).join('')+
       '</select></div>'+
       '<div class="modal-field"><label class="modal-lbl">METİN (checklist görünür)</label>'+
-      '<textarea class="modal-textarea" id="m-text" rows="5" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea></div>'+
+      '<textarea class="modal-textarea" id="m-text" rows="5" placeholder="Madde metni...">'+_esc(item?item.text:'')+'</textarea>'+'<button type="button" onclick="var t=document.getElementById(\"m-text\");t.rows=t.rows+3;" style="width:100%;background:#E5E5EA;border:none;border-radius:0 0 10px 10px;padding:4px;font-size:11px;color:#636366;cursor:pointer;">▼ Uzat</button></div>'+
       '<div class="modal-field"><label class="modal-lbl">DETAY (genişletme görünümü)</label>'+
-      '<textarea class="modal-textarea" id="m-detail" rows="8" placeholder="Detaylı açıklama..." style="min-height:120px;">'+_esc(item?item.detail||'':'')+'</textarea></div>';
+      '<textarea class="modal-textarea" id="m-detail" rows="8" placeholder="Detaylı açıklama..." style="min-height:120px;">'+_esc(item?item.detail||'':'')+'</textarea>'+'<button type="button" onclick="var t=document.getElementById(\"m-detail\");t.rows=t.rows+3;" style="width:100%;background:#E5E5EA;border:none;border-radius:0 0 10px 10px;padding:4px;font-size:11px;color:#636366;cursor:pointer;">▼ Uzat</button></div>';
 
     mbody.querySelector('.level-picker').onclick=function(ev){
       var opt=ev.target.closest('[data-lvl]'); if(!opt)return;
@@ -1136,25 +1136,6 @@ function _showAuthModal(ph){
 }
 
 // ===== MODAL HELPERS =====
-function _makeTouchResizable(el){
-  var startY=0, startH=0;
-  el.addEventListener('touchstart',function(e){
-    // Only if touch is near bottom edge (last 20px)
-    var rect=el.getBoundingClientRect();
-    if(e.touches[0].clientY > rect.bottom-24){
-      startY=e.touches[0].clientY; startH=el.offsetHeight;
-      e.preventDefault();
-    }
-  },{passive:false});
-  el.addEventListener('touchmove',function(e){
-    if(!startY) return;
-    var dy=e.touches[0].clientY-startY;
-    el.style.height=Math.max(80,startH+dy)+'px';
-    e.preventDefault();
-  },{passive:false});
-  el.addEventListener('touchend',function(){ startY=0; },{passive:true});
-}
-
 function _openModal(title,buildFn){
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-body').innerHTML='';
@@ -1163,10 +1144,6 @@ function _openModal(title,buildFn){
   document.getElementById('edit-modal').className='on';
   // scroll to top
   document.querySelector('.modal-body-wrap').scrollTop=0;
-  // Make all textareas touch-resizable
-  setTimeout(function(){
-    document.querySelectorAll('#modal-body .modal-textarea').forEach(_makeTouchResizable);
-  },100);
 }
 function _closeModal(){ document.getElementById('edit-modal').className=''; }
 function modalBgClick(e){ if(e.target.id==='edit-modal') _closeModal(); }
