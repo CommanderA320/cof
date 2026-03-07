@@ -399,6 +399,8 @@ function _loadData(cb) {
     if(Array.isArray(arr) && arr.length > 0){
       DATA = arr;
       _ls('set','cof_data_v2',JSON.stringify({phases:DATA}));
+      // Re-render UI with fresh server data
+      try{ ap=0; xi=null; bi=null; render(); } catch(e){}
     }
     if(cb) cb();
   })
