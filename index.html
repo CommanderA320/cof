@@ -372,21 +372,35 @@ function _ls(action, key, val) {
 }
 
 function _loadData(cb) {
-  // Always start from EMBEDDED_DATA (safe fallback)
+  // Set fallback from EMBEDDED_DATA
   DATA = EMBEDDED_DATA.map(function(x){return JSON.parse(JSON.stringify(x));});
   _DEFAULT_DATA = JSON.stringify(DATA);
-  // Try to override with saved data
+
+  // Try localStorage first as quick start
   try {
     var saved = _ls('get', 'cof_data_v2');
     if (saved) {
       var p = JSON.parse(saved);
       var arr = p.phases || p;
-      if (Array.isArray(arr) && arr.length > 0) {
-        DATA = arr;
-      }
+      if (Array.isArray(arr) && arr.length > 0) DATA = arr;
     }
   } catch(e) {}
-  if(cb) cb();
+
+  // Always fetch fresh data.json from server (cache busted)
+  fetch('./data.json?t='+Date.now())
+  .then(function(r){ if(!r.ok) throw new Error('data.json not found'); return r.json(); })
+  .then(function(d){
+    var arr = d.phases || d;
+    if(Array.isArray(arr) && arr.length > 0){
+      DATA = arr;
+      _ls('set','cof_data_v2',JSON.stringify({phases:DATA}));
+    }
+    if(cb) cb();
+  })
+  .catch(function(){
+    // Server fetch failed, use localStorage/EMBEDDED fallback already set
+    if(cb) cb();
+  });
 }
 
 function _saveData(){
@@ -433,54 +447,26 @@ function syncToGitHub(silent){
   if(!token){ if(!silent) alert('GitHub token girilmemiş. Ayarlardan ekle.'); return; }
   var headers = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
   var dataStr = JSON.stringify({version:'1.0',phases:DATA},null,2);
-  _showSyncBadge('🔄 Sync yapılıyor...',true);
-
-  // Step 1: Fetch current index.html from GitHub
-  var htmlBase = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/index.html';
-  var dataBase = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE;
-
-  fetch(htmlBase+'?ref='+GITHUB_BRANCH+'&t='+Date.now(), {headers:headers})
-  .then(function(r){ if(!r.ok) throw new Error('index.html fetch failed: '+r.status); return r.json(); })
-  .then(function(htmlMeta){
-    var htmlSha = htmlMeta.sha;
-    // Decode current index.html
-    var currentHTML = decodeURIComponent(escape(atob(htmlMeta.content.replace(/\n/g,''))));
-    // Replace EMBEDDED_DATA in it
-    var newHTML = currentHTML.replace(
-      /var EMBEDDED_DATA = \[[\s\S]*?\];(?=\s*var REFERENCES)/,
-      'var EMBEDDED_DATA = '+JSON.stringify(DATA)+';'
-    );
-    if(newHTML === currentHTML) throw new Error('EMBEDDED_DATA bulunamadı');
-    var newEncoded = btoa(unescape(encodeURIComponent(newHTML)));
-
-    // Step 2: Push updated index.html
-    return fetch(htmlBase,{
-      method:'PUT', headers:headers,
-      body:JSON.stringify({message:'COF sync '+new Date().toISOString(),content:newEncoded,sha:htmlSha,branch:GITHUB_BRANCH})
-    });
-  })
-  .then(function(r){ return r.json(); })
+  var encoded = btoa(unescape(encodeURIComponent(dataStr)));
+  var apiBase = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE;
+  _showSyncBadge('🔄 Sync...',true);
+  // Fetch current SHA
+  fetch(apiBase+'?ref='+GITHUB_BRANCH+'&t='+Date.now(), {headers:headers})
+  .then(function(r){ if(!r.ok) throw new Error('SHA fetch: '+r.status); return r.json(); })
   .then(function(d){
-    if(!d.content) throw new Error(d.message||'index.html push failed');
-    // Step 3: Also update data.json
-    return fetch(dataBase+'?ref='+GITHUB_BRANCH+'&t='+Date.now(), {headers:headers});
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    var dataSha = d.sha;
-    var encoded = btoa(unescape(encodeURIComponent(dataStr)));
-    return fetch(dataBase,{
+    if(!d.sha) throw new Error('SHA bulunamadı');
+    return fetch(apiBase,{
       method:'PUT', headers:headers,
-      body:JSON.stringify({message:'COF data '+new Date().toISOString(),content:encoded,sha:dataSha,branch:GITHUB_BRANCH})
+      body:JSON.stringify({message:'COF sync '+new Date().toISOString(),content:encoded,sha:d.sha,branch:GITHUB_BRANCH})
     });
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
     if(d.content){
       _ls('rm','gh_sync_pending');
-      _showSyncBadge('✅ GitHub synced');
+      _showSyncBadge('✅ Synced');
     } else {
-      throw new Error(d.message||'data.json push failed');
+      throw new Error(d.message||'push failed');
     }
   })
   .catch(function(e){
