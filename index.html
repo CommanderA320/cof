@@ -386,9 +386,14 @@ function _loadData(cb) {
     }
   } catch(e) {}
 
-  // Always fetch fresh data.json from server (cache busted)
-  fetch('./data.json?t='+Date.now())
-  .then(function(r){ if(!r.ok) throw new Error('data.json not found'); return r.json(); })
+  // Fetch from GitHub API — bypasses CDN cache, always latest
+  var token = _ghToken();
+  var apiUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE+'?ref='+GITHUB_BRANCH;
+  var fetchHeaders = token
+    ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3.raw'}
+    : {'Accept':'application/vnd.github.v3.raw'};
+  fetch(apiUrl, {headers:fetchHeaders, cache:'no-store'})
+  .then(function(r){ if(!r.ok) throw new Error('API '+r.status); return r.json(); })
   .then(function(d){
     var arr = d.phases || d;
     if(Array.isArray(arr) && arr.length > 0){
@@ -398,7 +403,6 @@ function _loadData(cb) {
     if(cb) cb();
   })
   .catch(function(){
-    // Server fetch failed, use localStorage/EMBEDDED fallback already set
     if(cb) cb();
   });
 }
