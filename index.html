@@ -2114,7 +2114,7 @@ function sendQuery() {
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 3000,
+      max_tokens: 4000,
       system: [
         {type: "text", text: systemMsg, cache_control: {type: "ephemeral"}}
       ],
