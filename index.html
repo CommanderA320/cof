@@ -529,29 +529,94 @@ function switchEditTab(tab){
 
 // ===== DOCUMENT MANAGER =====
 var _docExtractProgress = {};
+var _docCache = {}; // in-memory GitHub doc cache
 
-function _getStorageUsed(){
-  var total = 0;
-  try{
-    for(var k in localStorage){
-      if(k.startsWith('doc_text_')) total += (localStorage[k]||'').length;
-    }
-  }catch(e){}
-  return total;
+// GitHub docs path
+function _ghDocsPath(docCode){
+  return 'docs/' + docCode.replace(/[^a-zA-Z0-9_\-]/g,'_') + '.txt';
+}
+
+// Save doc text to GitHub docs/ folder
+function _saveDocToGitHub(docCode, text, cb){
+  var token = _ghToken();
+  if(!token){ cb && cb(new Error('No GitHub token')); return; }
+  var path = _ghDocsPath(docCode);
+  var url = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path;
+  var headers = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  // Get SHA if exists
+  fetch(url, {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}, cache:'no-store'})
+  .then(function(r){ return r.ok ? r.json() : null; })
+  .then(function(existing){
+    // GitHub API requires base64. Use chunked approach for large text
+    var encoded;
+    try { encoded = btoa(unescape(encodeURIComponent(text))); }
+    catch(e) { encoded = btoa(text.replace(/[^\x00-\x7F]/g,'?')); }
+    var body = {message:'doc: update '+docCode, content:encoded, branch:GITHUB_BRANCH};
+    if(existing && existing.sha) body.sha = existing.sha;
+    return fetch(url, {method:'PUT', headers:headers, body:JSON.stringify(body)});
+  })
+  .then(function(r){
+    if(r.ok){ _docCache[docCode] = text; cb && cb(null); }
+    else return r.json().then(function(e){ cb && cb(new Error(e.message||'GitHub write error')); });
+  })
+  .catch(function(e){ cb && cb(e); });
+}
+
+// Load doc text from GitHub (with in-memory cache)
+function _loadDocFromGitHub(docCode, cb){
+  if(_docCache[docCode]){ cb && cb(null, _docCache[docCode]); return; }
+  var token = _ghToken();
+  var path = _ghDocsPath(docCode);
+  var url = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path;
+  var headers = token
+    ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3.raw'}
+    : {'Accept':'application/vnd.github.v3.raw'};
+  fetch(url, {headers:headers, cache:'no-store'})
+  .then(function(r){ if(r.ok) return r.text(); throw new Error('404'); })
+  .then(function(t){ _docCache[docCode]=t; cb && cb(null, t); })
+  .catch(function(e){ cb && cb(e, ''); });
+}
+
+// Get doc text — cache first, then localStorage fallback
+function _getDocText(docCode){
+  if(_docCache[docCode]) return _docCache[docCode];
+  try{ return localStorage.getItem('doc_text_'+docCode)||''; }catch(e){ return ''; }
+}
+
+// Check if a doc is available (cache or localStorage)
+function _docAvailable(docCode){
+  if(_docCache[docCode] && _docCache[docCode].length > 100) return true;
+  try{ return (localStorage.getItem('doc_text_'+docCode)||'').length > 100; }catch(e){ return false; }
+}
+
+// Preload all docs from GitHub into memory cache
+var _preloadDone = false;
+function _preloadDocs(onStatus, onDone){
+  var codes = REFERENCES.map(function(r){return r.code;});
+  var i = 0;
+  function next(){
+    if(i >= codes.length){ _preloadDone = true; onDone && onDone(); return; }
+    var code = codes[i++];
+    if(_docCache[code]){ next(); return; }
+    onStatus && onStatus('⏳ Yükleniyor: '+code+' ('+i+'/'+codes.length+')');
+    _loadDocFromGitHub(code, function(err, text){
+      if(!err && text && text.length > 100) _docCache[code] = text;
+      setTimeout(next, 80);
+    });
+  }
+  next();
 }
 
 function _renderDocManager(){
   var body = document.getElementById('edit-body');
   body.innerHTML = '';
 
-  // Storage bar
-  var used = _getStorageUsed();
-  var MAX = 15000000;
-  var pct = Math.min(100, Math.round(used/MAX*100));
-  var color = pct > 85 ? 'danger' : pct > 65 ? 'warn' : '';
+  // Storage info — GitHub based, no limit
   var storDiv = document.createElement('div');
   storDiv.style.cssText = 'padding:4px 4px 8px;';
-  storDiv.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8E8E93;margin-bottom:4px;"><span>Döküman Depolama</span><span>'+Math.round(used/1024)+' KB / '+Math.round(MAX/1024)+' KB &nbsp;(döküman başı max 3MB)</span></div><div class="doc-storage-bar"><div class="doc-storage-fill '+color+'" style="width:'+pct+'%"></div></div>';
+  var cached = REFERENCES.filter(function(r){ return _docAvailable(r.code); }).length;
+  storDiv.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8E8E93;margin-bottom:4px;"><span>Döküman Depolama</span><span style="color:#34C759;">☁️ GitHub docs/ — Limit yok</span></div>'
+    +'<div style="font-size:10px;color:#636366;padding:2px 0;">'+cached+' / '+REFERENCES.length+' döküman yüklü</div>';
   body.appendChild(storDiv);
 
   // Header with + New Doc button
@@ -566,9 +631,8 @@ function _renderDocManager(){
   body.appendChild(docHdr);
 
   REFERENCES.forEach(function(ref){
-    var stored = '';
-    try{ stored = localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
-    var hasDoc = stored.length > 0;
+    var stored = _getDocText(ref.code);
+    var hasDoc = stored.length > 100;
     var progress = _docExtractProgress[ref.code] || '';
     var refCode = ref.code;
 
@@ -586,6 +650,7 @@ function _renderDocManager(){
       var idx = REFERENCES.findIndex(function(r){ return r.code === refCode; });
       if(idx > -1) REFERENCES.splice(idx, 1);
       try{ localStorage.removeItem('doc_text_'+refCode); }catch(e){}
+      delete _docCache[refCode];
       _renderDocManager();
     };
     wrap.appendChild(delBg);
@@ -612,7 +677,7 @@ function _renderDocManager(){
     info.className = 'doc-info';
     info.innerHTML = '<div class="doc-title">'+ref.title+'</div>'
       +(ref.rev?'<div class="doc-meta">'+ref.rev+'</div>':'')
-      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB yüklü</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
+      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB — ☁️ GitHub</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
       +(progress?'<div class="doc-progress">'+progress+'</div>':'');
 
     // Hidden file input
@@ -709,47 +774,33 @@ function _extractPDF(file, docCode){
       var texts = [];
       var pageNum = 1;
 
-      // Per-doc size limit: 3MB for large docs (MEL etc), total localStorage ~10MB
-      var PER_DOC_MAX = 3000000;
-
       function getPage(){
         if(pageNum > totalPages){
           var fullText = texts.join('\n');
-
-          // Hard per-doc cap — no matter what
-          if(fullText.length > PER_DOC_MAX){
-            fullText = fullText.substring(0, PER_DOC_MAX);
-            _docExtractProgress[docCode] = '⚠️ '+Math.round(PER_DOC_MAX/1024)+'KB alındı (limit)';
-          } else {
-            _docExtractProgress[docCode] = '';
-          }
-
-          // Try saving, handle quota error gracefully
-          var saved = false;
-          try{
-            localStorage.setItem('doc_text_'+docCode, fullText);
-            saved = true;
-          }catch(e){
-            // Quota hit — try progressively smaller chunks
-            var attempt = Math.floor(fullText.length * 0.6);
-            while(attempt > 20000){
-              try{
-                localStorage.setItem('doc_text_'+docCode, fullText.substring(0, attempt));
-                _docExtractProgress[docCode] = '⚠️ '+Math.round(attempt/1024)+'KB alındı (sıkıştırıldı)';
-                saved = true;
-                break;
-              }catch(e2){ attempt = Math.floor(attempt * 0.6); }
-            }
-            if(!saved){
-              _docExtractProgress[docCode] = '❌ Depolama dolu! Başka döküman sil.';
-              _renderDocManager(); return;
-            }
-          }
+          var kb = Math.round(fullText.length/1024);
+          _docExtractProgress[docCode] = '⏳ GitHub\'a yükleniyor... ('+kb+'KB, '+totalPages+' sayfa)';
           _renderDocManager();
+
+          _saveDocToGitHub(docCode, fullText, function(saveErr){
+            if(saveErr){
+              // Fallback: localStorage with 3MB cap
+              var cap = 3000000;
+              var txt = fullText.length > cap ? fullText.substring(0, cap) : fullText;
+              try{
+                localStorage.setItem('doc_text_'+docCode, txt);
+                _docExtractProgress[docCode] = '⚠️ GitHub hatası ('+saveErr.message+') — localStorage: '+Math.round(txt.length/1024)+'KB';
+              }catch(le){
+                _docExtractProgress[docCode] = '❌ Kayıt başarısız: '+saveErr.message;
+              }
+            } else {
+              _docExtractProgress[docCode] = '✅ '+Math.round(fullText.length/1024)+'KB, '+totalPages+' sayfa → ☁️ GitHub';
+            }
+            _renderDocManager();
+          });
           return;
         }
         _docExtractProgress[docCode] = '⏳ Sayfa '+pageNum+' / '+totalPages;
-        if(pageNum % 10 === 1) _renderDocManager();
+        if(pageNum % 30 === 1) _renderDocManager();
         pdf.getPage(pageNum).then(function(page){
           page.getTextContent().then(function(tc){
             var pageText = tc.items.map(function(i){return i.str;}).join(' ');
@@ -768,6 +819,7 @@ function _extractPDF(file, docCode){
   reader.readAsArrayBuffer(file);
   }); // end _loadPDFjs
 }
+
 
 // ===== BM25 SEARCH ENGINE =====
 function _tokenize(text){
@@ -820,7 +872,7 @@ function _bm25Search(query, maxChunks){
   var allChunks = [];
   REFERENCES.forEach(function(ref){
     var text='';
-    try{ text=localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
+    text = _getDocText(ref.code);
     if(!text) return;
     var chunks = _chunkDoc(ref.code, ref.title, text);
     chunks.forEach(function(c){ c.score=_bm25Score(c,queryTerms); allChunks.push(c); });
@@ -852,7 +904,7 @@ function _bm25Search(query, maxChunks){
 function _getMELContext(registration){
   if(!registration) return '';
   var melText='';
-  try{ melText=localStorage.getItem('doc_text_MEL')||''; }catch(e){}
+  melText = _getDocText('MEL');
   if(!melText) return '';
 
   var reg = registration.toUpperCase().trim();
@@ -887,7 +939,7 @@ function _getLoadedDocTags(){
   var tags = '';
   REFERENCES.forEach(function(ref){
     var text='';
-    try{ text=localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
+    text = _getDocText(ref.code);
     var loaded = text.length > 100;
     tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'">'+ref.code+(loaded?' ✓':'')+'</span>';
   });
@@ -897,7 +949,7 @@ function _getLoadedDocTags(){
 // ===== OPEN IN DOCUMENT =====
 function _openInDoc(docCode, ref){
   var text = '';
-  try{ text = localStorage.getItem('doc_text_'+docCode)||''; }catch(e){}
+  text = _getDocText(docCode);
 
   if(!text){
     var refInfo = REFERENCES.find(function(r){ return r.code===docCode; });
@@ -942,7 +994,7 @@ function _openInDoc(docCode, ref){
     for(var ri=0; ri<REFERENCES.length; ri++){
       if(REFERENCES[ri].code === docCode) continue;
       var altText = '';
-      try{ altText = localStorage.getItem('doc_text_'+REFERENCES[ri].code)||''; }catch(e){}
+      altText = _getDocText(REFERENCES[ri].code);
       if(!altText) continue;
       var altFound = _searchInText(altText, ref);
       if(altFound){ found = altFound; foundDoc = REFERENCES[ri].code; break; }
@@ -1833,23 +1885,37 @@ function checkKey(){
 function openAI() {
   document.getElementById("ai-screen").className = "on";
   checkKey();
-  // Populate doc tags dynamically
-  var tagsEl = document.getElementById('ai-doc-tags');
-  if(tagsEl){
-    var tags = '';
-    REFERENCES.forEach(function(ref){
-      var text=''; try{text=localStorage.getItem('doc_text_'+ref.code)||'';}catch(e){}
-      var loaded = text.length > 100;
-      tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'">'+ref.code+(loaded?' ✓':'')+'</span>';
-    });
-    tagsEl.innerHTML = tags;
-  }
+
   // Restore saved registration
   var regEl = document.getElementById('ai-reg-input');
   if(regEl){
     var saved = _ls('get','ai_registration')||'';
     if(saved) regEl.value = saved;
   }
+
+  function _updateDocTags(statusMsg){
+    var tagsEl = document.getElementById('ai-doc-tags');
+    if(!tagsEl) return;
+    if(statusMsg){
+      tagsEl.innerHTML = '<span class="ctx-tag" style="color:#007AFF;">'+statusMsg+'</span>';
+      return;
+    }
+    var tags = '';
+    REFERENCES.forEach(function(ref){
+      var loaded = _docAvailable(ref.code);
+      tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'" title="'+ref.title+'">'+ref.code+(loaded?' ✓':'')+'</span>';
+    });
+    tagsEl.innerHTML = tags;
+  }
+
+  _updateDocTags();
+  if(!_preloadDone){
+    _preloadDocs(
+      function(msg){ _updateDocTags(msg); },
+      function(){ _updateDocTags(); }
+    );
+  }
+
   document.getElementById("ai-input").focus();
 }
 
@@ -1944,7 +2010,7 @@ function sendQuery() {
 
   // Loaded docs list
   var loadedDocs = REFERENCES.filter(function(r){
-    var t=''; try{t=localStorage.getItem('doc_text_'+r.code)||'';}catch(e){} return t.length>100;
+    return _docAvailable(r.code);
   }).map(function(r){return r.code;});
   var subEl = document.getElementById('ai-loading-sub');
   if(subEl) subEl.textContent = loadedDocs.length ? loadedDocs.slice(0,5).join(' | ')+(loadedDocs.length>5?' +'+( loadedDocs.length-5):'') : 'Base knowledge only';
@@ -2205,7 +2271,7 @@ function openReferences(){
   var list = document.getElementById('ref-list');
   list.innerHTML = REFERENCES.map(function(r){
     var stored = '';
-    try{ stored = localStorage.getItem('doc_text_'+r.code)||''; }catch(e){}
+    stored = _getDocText(r.code);
     var hasDoc = stored.length > 0;
     return '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:#2C2C2E;border-radius:12px;margin-bottom:8px;">'+
       '<div style="background:'+r.color+';border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;">'+r.code+'</div>'+
