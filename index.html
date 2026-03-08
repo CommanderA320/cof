@@ -932,6 +932,7 @@ function _bm25Search(query, maxChunks){
 
   // Take top N, build context string
   var selected = allChunks.filter(function(c){return c.score>0;}).slice(0, maxChunks);
+  selected = selected.map(function(c){ return {doc:c.doc,title:c.title,text:c.text.substring(0,800)}; });
   if(!selected.length) return '';
 
   // Group by doc for clean output
@@ -2079,7 +2080,7 @@ function sendQuery() {
   }
 
   // BM25: pick most relevant chunks from loaded docs
-  var docContext = _bm25Search(input, 6);
+  var docContext = _bm25Search(input, 3);
   // MEL registration-specific items
   var melContext = _getMELContext(registration);
 
@@ -2102,7 +2103,7 @@ function sendQuery() {
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 6000,
+      max_tokens: 3000,
       system: systemMsg,
       messages: [{role: "user", content: userContent}]
     })
