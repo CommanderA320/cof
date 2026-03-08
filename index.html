@@ -886,7 +886,7 @@ function _chunkDoc(docCode, docTitle, text){
     var wc = p.split(/\s+/).length;
     buf += (buf ? '\n' : '') + p;
     bufWords += wc;
-    if(bufWords >= 250 || i === paras.length-1){
+    if(bufWords >= 150 || i === paras.length-1){
       chunks.push({doc:docCode, title:docTitle, text:buf});
       buf=''; bufWords=0;
     }
@@ -2079,7 +2079,7 @@ function sendQuery() {
   }
 
   // BM25: pick most relevant chunks from loaded docs
-  var docContext = _bm25Search(input, 22);
+  var docContext = _bm25Search(input, 8);
   // MEL registration-specific items
   var melContext = _getMELContext(registration);
 
