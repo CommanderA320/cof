@@ -160,6 +160,11 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-model-badge{background:#F0FFF4;border:1px solid #C6F6D5;border-radius:8px;padding:4px 8px;font-size:9px;font-weight:800;color:#1A7A3A;white-space:nowrap;}
 .ai-body{flex:1;overflow-y:auto;padding:16px 16px 0;}
 .ai-context-box{background:#fff;border-radius:12px;border:1px solid #E5E5EA;padding:12px 14px;margin-bottom:12px;}
+.ai-reg-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #F2F2F7;}
+.ai-reg-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
+.ai-reg-input{flex:1;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F9F9F9;text-transform:uppercase;outline:none;}
+.ai-reg-input:focus{border-color:#E30613;background:#fff;}
+.ctx-tag.loaded{background:#EDFFF4;color:#1A7A3A;border-color:#34C759;}
 .ai-context-title{font-size:10px;font-weight:800;color:#636366;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
 .ai-context-title:before{content:'';display:block;width:8px;height:8px;background:#E30613;border-radius:50%;}
 .ai-context-tags{display:flex;flex-wrap:wrap;gap:6px;}
@@ -752,17 +757,129 @@ function _extractPDF(file, docCode){
   }); // end _loadPDFjs
 }
 
-// Build document context for AI
-function _getDocContext(){
-  var ctx = '';
-  REFERENCES.forEach(function(ref){
-    var text = '';
-    try{ text = localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
-    if(text.length > 0){
-      ctx += '\n\n=== '+ref.code+': '+ref.title+' ('+ref.rev+') ===\n'+text;
+// ===== BM25 SEARCH ENGINE =====
+function _tokenize(text){
+  return text.toLowerCase().replace(/[^a-z0-9\.\-\/]/g,' ').split(/\s+/).filter(function(t){return t.length>2;});
+}
+
+function _chunkDoc(docCode, docTitle, text){
+  // Split into ~300 word paragraphs, keep doc label on each
+  var paras = text.split(/\n{2,}|\r\n{2,}/);
+  var chunks = [];
+  var buf = '', bufWords = 0;
+  for(var i=0;i<paras.length;i++){
+    var p = paras[i].trim();
+    if(!p) continue;
+    var wc = p.split(/\s+/).length;
+    buf += (buf ? '\n' : '') + p;
+    bufWords += wc;
+    if(bufWords >= 250 || i === paras.length-1){
+      chunks.push({doc:docCode, title:docTitle, text:buf});
+      buf=''; bufWords=0;
     }
+  }
+  return chunks;
+}
+
+function _bm25Score(chunk, queryTerms){
+  var text = chunk.text.toLowerCase();
+  var words = text.split(/\s+/);
+  var N = words.length || 1;
+  var k1=1.5, b=0.75, avgdl=200;
+  var score=0;
+  queryTerms.forEach(function(term){
+    var tf=0;
+    words.forEach(function(w){if(w.indexOf(term)>-1)tf++;});
+    if(tf===0) return;
+    var idf = Math.log(1 + (1000-1+0.5)/(tf+0.5)); // simplified
+    score += idf * (tf*(k1+1)) / (tf + k1*(1-b+b*N/avgdl));
+  });
+  return score;
+}
+
+function _bm25Search(query, maxChunks){
+  maxChunks = maxChunks || 20;
+  var queryTerms = _tokenize(query);
+  // Add aviation keyword boosts
+  var avKeywords = ['mel','qrh','fcom','fctm','rnav','pbn','rnp','immc','bat','rat','hydraulic',
+    'emer','gen','adr','fms','fmgc','shall','must','commander','terrain','msa','mva','mayday'];
+  avKeywords.forEach(function(k){ if(query.toLowerCase().indexOf(k)>-1 && queryTerms.indexOf(k)===-1) queryTerms.push(k); });
+
+  var allChunks = [];
+  REFERENCES.forEach(function(ref){
+    var text='';
+    try{ text=localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
+    if(!text) return;
+    var chunks = _chunkDoc(ref.code, ref.title, text);
+    chunks.forEach(function(c){ c.score=_bm25Score(c,queryTerms); allChunks.push(c); });
+  });
+
+  // Sort by score desc
+  allChunks.sort(function(a,b){return b.score-a.score;});
+
+  // Take top N, build context string
+  var selected = allChunks.filter(function(c){return c.score>0;}).slice(0, maxChunks);
+  if(!selected.length) return '';
+
+  // Group by doc for clean output
+  var byDoc = {};
+  selected.forEach(function(c){
+    if(!byDoc[c.doc]) byDoc[c.doc]={title:c.title, chunks:[]};
+    byDoc[c.doc].chunks.push(c.text);
+  });
+
+  var ctx = '';
+  Object.keys(byDoc).forEach(function(doc){
+    ctx += '\n\n=== '+doc+': '+byDoc[doc].title+' ===\n';
+    ctx += byDoc[doc].chunks.join('\n---\n');
   });
   return ctx;
+}
+
+// ===== MEL REGISTRATION PARSER =====
+function _getMELContext(registration){
+  if(!registration) return '';
+  var melText='';
+  try{ melText=localStorage.getItem('doc_text_MEL')||''; }catch(e){}
+  if(!melText) return '';
+
+  var reg = registration.toUpperCase().trim();
+  var lines = melText.split('\n');
+  var result = [];
+  var inBlock = false;
+  var blockBuf = [];
+  var blockStart = -1;
+
+  for(var i=0;i<lines.length;i++){
+    var line = lines[i];
+    var lineUp = line.toUpperCase();
+
+    // Check if line contains our registration
+    if(lineUp.indexOf(reg) > -1){
+      // Capture surrounding context (20 lines before + 30 after)
+      var s = Math.max(0, i-5);
+      var e = Math.min(lines.length-1, i+30);
+      var block = lines.slice(s,e).join('\n').trim();
+      // Avoid duplicates
+      if(result.indexOf(block)===-1) result.push(block);
+      i = e; // skip ahead
+    }
+  }
+
+  if(!result.length) return '';
+  return '\n\n=== MEL DEFERRED ITEMS — REGISTRATION: '+reg+' ===\n'+result.join('\n---\n');
+}
+
+// Build dynamic context tags for UI
+function _getLoadedDocTags(){
+  var tags = '';
+  REFERENCES.forEach(function(ref){
+    var text='';
+    try{ text=localStorage.getItem('doc_text_'+ref.code)||''; }catch(e){}
+    var loaded = text.length > 100;
+    tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'">'+ref.code+(loaded?' ✓':'')+'</span>';
+  });
+  return tags;
 }
 
 // ===== OPEN IN DOCUMENT =====
@@ -1677,7 +1794,7 @@ function resetAll(){CK={};CT={};CP={};ap=0;xi=null;bi=null;document.getElementBy
 
 
 // ---- AI QUERY ----
-var AI_SYSTEM = "You are an expert aviation safety officer and A320 series type rated Commander with deep knowledge of Turkish Airlines Operations Manual Part-A, Airbus FCOM/FCTM, EASA CAT.OP.MPA regulations, ICAO Annex 6, MEL procedures, IATA DGR, and Weight and Balance principles. When a Commander describes a multi-parameter operational scenario, you must:\n\n1. RISK ASSESSMENT: Immediately identify HIGH/MEDIUM/LOW risk factors\n2. REGULATORY CHECK: List specific applicable rules with section references (OM Part-A sections, EASA regs, ICAO annexes)\n3. PREREQUISITES: State what must be verified before proceeding\n4. COMMANDER DECISION: Give a clear structured recommendation\n5. CHECKLIST TRIGGERS: State which additional checklist phases get activated\n\nFormat your response with clear sections using these exact headers:\n--- RISK FACTORS ---\n--- APPLICABLE REGULATIONS ---\n--- PREREQUISITES TO VERIFY ---\n--- COMMANDER DECISION FRAMEWORK ---\n--- ADDITIONAL CHECKLIST ITEMS ---\n\nBe concise, direct and operationally focused. Always reference specific section numbers. Never be vague. This is a real operational decision support tool.";
+var AI_SYSTEM = "You are an expert aviation safety officer and A320 series type rated Commander with deep knowledge of Turkish Airlines Operations Manual Part-A, Airbus FCOM/FCTM, EASA CAT.OP.MPA regulations, ICAO Annex 6, MEL procedures, IATA DGR, and Weight and Balance principles.\n\nWhen a Commander describes a multi-parameter operational scenario, you must:\n\n1. RISK ASSESSMENT: Immediately identify HIGH/MEDIUM/LOW risk factors. If multiple system failures interact (electrical, hydraulic, navigation), trace the full dependency chain.\n2. REGULATORY CHECK: List specific applicable rules with exact section references (OM Part-A sections, EASA regs, ICAO annexes). If a document excerpt is provided, cite it directly.\n3. AIRCRAFT STATUS: If a registration is provided and MEL deferred items are listed for that registration, treat them as ACTIVE constraints that compound the scenario.\n4. PREREQUISITES: State what must be verified before proceeding.\n5. COMMANDER DECISION: Give a clear structured recommendation. For compounding failures, use FOR-DEC framework explicitly.\n6. CHECKLIST TRIGGERS: State which additional checklist phases get activated.\n\nFormat your response with clear sections using these exact headers:\n--- RISK FACTORS ---\n--- APPLICABLE REGULATIONS ---\n--- AIRCRAFT STATUS (MEL/DEFERRED ITEMS) ---\n--- PREREQUISITES TO VERIFY ---\n--- COMMANDER DECISION FRAMEWORK ---\n--- ADDITIONAL CHECKLIST ITEMS ---\n\nFor complex cascading failures (electrical + hydraulic + navigation), explicitly map each system dependency. Be concise, direct, operationally focused. Always reference specific section numbers. Never be vague. This is a real operational decision support tool used by airline commanders.";
 
 function resetKey(){
   _ls('rm','thy_api_key');
@@ -1704,6 +1821,23 @@ function checkKey(){
 function openAI() {
   document.getElementById("ai-screen").className = "on";
   checkKey();
+  // Populate doc tags dynamically
+  var tagsEl = document.getElementById('ai-doc-tags');
+  if(tagsEl){
+    var tags = '';
+    REFERENCES.forEach(function(ref){
+      var text=''; try{text=localStorage.getItem('doc_text_'+ref.code)||'';}catch(e){}
+      var loaded = text.length > 100;
+      tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'">'+ref.code+(loaded?' ✓':'')+'</span>';
+    });
+    tagsEl.innerHTML = tags;
+  }
+  // Restore saved registration
+  var regEl = document.getElementById('ai-reg-input');
+  if(regEl){
+    var saved = _ls('get','ai_registration')||'';
+    if(saved) regEl.value = saved;
+  }
   document.getElementById("ai-input").focus();
 }
 
@@ -1743,18 +1877,28 @@ function sendQuery() {
   var input = document.getElementById("ai-input").value.trim();
   if (!input) return;
 
+  // Registration — read from input, persist
+  var regEl = document.getElementById('ai-reg-input');
+  var registration = regEl ? regEl.value.trim().toUpperCase() : (_ls('get','ai_registration')||'');
+  if(registration) _ls('set','ai_registration', registration);
+
   // Show loading
   document.getElementById("ai-loading").className = "ai-loading on";
   document.getElementById("ai-result").className = "ai-result";
   document.getElementById("ai-send-btn").disabled = true;
 
-  // Scroll to loading
+  // Loaded docs list
+  var loadedDocs = REFERENCES.filter(function(r){
+    var t=''; try{t=localStorage.getItem('doc_text_'+r.code)||'';}catch(e){} return t.length>100;
+  }).map(function(r){return r.code;});
+  var subEl = document.getElementById('ai-loading-sub');
+  if(subEl) subEl.textContent = loadedDocs.length ? loadedDocs.slice(0,5).join(' | ')+(loadedDocs.length>5?' +'+( loadedDocs.length-5):'') : 'Base knowledge only';
+
   setTimeout(function() {
     document.getElementById("ai-loading").scrollIntoView({behavior:"smooth", block:"center"});
   }, 100);
 
   var t = utcNow();
-
   var apiKey = _ls('get','thy_api_key')||'';
   if(!apiKey){
     checkKey();
@@ -1762,17 +1906,33 @@ function sendQuery() {
     document.getElementById('ai-send-btn').disabled=false;
     return;
   }
+
+  // BM25: pick most relevant chunks from loaded docs
+  var docContext = _bm25Search(input, 22);
+  // MEL registration-specific items
+  var melContext = _getMELContext(registration);
+
+  var systemMsg = AI_SYSTEM;
+  if(registration) systemMsg += '\n\nAIRCRAFT REGISTRATION IN CONTEXT: '+registration+'. When MEL deferred items are provided for this registration, treat them as ACTIVE constraints on the current operation.';
+  if(melContext || docContext){
+    systemMsg += '\n\n=== REFERENCE DOCUMENT EXCERPTS (BM25 relevance-selected) ===';
+    systemMsg += '\nUse these as PRIMARY source. Cite exact section numbers.';
+    if(melContext) systemMsg += melContext;
+    if(docContext) systemMsg += docContext;
+  }
+
+  var userContent = 'AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\n';
+  if(registration) userContent += 'REGISTRATION: '+registration+'\n';
+  userContent += 'DOCS LOADED: '+(loadedDocs.length ? loadedDocs.join(', ') : 'none')+'\n\nCOMMANDER SCENARIO QUERY:\n'+input;
+
   fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: AI_SYSTEM + (_getDocContext() ? "\n\n=== LOADED REFERENCE DOCUMENTS ===\nThe following documents have been loaded and should be your PRIMARY source for answers. Cite specific section numbers and page references when possible.\n" + _getDocContext() : ""),
-      messages: [{
-        role: "user",
-        content: "AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\nREFERENCE DOCUMENTS: OM Part-A, A320 FCOM, MEL, IATA DGR, W&B Manual, EASA CAT.OP.MPA, ICAO Annex 6\n\nCOMMANDER SCENARIO QUERY:\n" + input
-      }]
+      max_tokens: 1400,
+      system: systemMsg,
+      messages: [{role: "user", content: userContent}]
     })
   })
   .then(function(r) { return r.json(); })
@@ -1861,16 +2021,13 @@ _loadData(function(){
     <!-- Context box -->
     <div class="ai-context-box">
       <div class="ai-context-title">Active Document Context</div>
-      <div class="ai-context-tags">
-        <span class="ctx-tag doc">OM Part-A</span>
-        <span class="ctx-tag doc">A320 FCOM</span>
-        <span class="ctx-tag doc">MEL</span>
-        <span class="ctx-tag doc">DGR IATA</span>
-        <span class="ctx-tag doc">W&amp;B Manual</span>
-        <span class="ctx-tag doc">EASA CAT.OP</span>
-        <span class="ctx-tag doc">ICAO Annex 6</span>
-        <span class="ctx-tag">A320 Series</span>
-        <span class="ctx-tag">THY Operations</span>
+      <div class="ai-context-tags" id="ai-doc-tags">
+        <span class="ctx-tag doc">Loading...</span>
+      </div>
+      <div class="ai-reg-row">
+        <span class="ai-reg-label">✈ Reg</span>
+        <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);" />
+        <span style="font-size:11px;color:#8E8E93;">MEL auto-link</span>
       </div>
     </div>
 
@@ -1899,7 +2056,7 @@ _loadData(function(){
     <div class="ai-loading" id="ai-loading">
       <div class="ai-spinner"></div>
       <div class="ai-loading-txt">Analysing scenario against<br>operational parameters...</div>
-      <div class="ai-loading-sub">OM Part-A | MEL | FCOM | EASA | ICAO</div>
+      <div class="ai-loading-sub" id="ai-loading-sub">OM Part-A | MEL | FCOM | EASA | ICAO</div>
     </div>
 
     <!-- Result -->
