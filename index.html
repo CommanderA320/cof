@@ -693,25 +693,23 @@ function _renderDocManager(){
       +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB — ☁️ GitHub</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
       +(progress?'<div class="doc-progress">'+progress+'</div>':'');
 
-    // Hidden file input — must be on body for Safari click() to work
+    // Label wrapping input — works natively in Safari without .click()
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.pdf';
-    fileInput.style.cssText = 'position:fixed;top:-999px;left:-999px;opacity:0;';
+    fileInput.id = 'fi-' + refCode;
+    fileInput.style.cssText = 'display:none;';
     fileInput.onchange = function(e){
       var file = e.target.files[0];
       if(file) _extractPDF(file, refCode);
-      document.body.removeChild(fileInput);
+      fileInput.value = '';
     };
 
-    var uploadBtn = document.createElement('button');
+    var uploadBtn = document.createElement('label');
+    uploadBtn.htmlFor = 'fi-' + refCode;
     uploadBtn.className = 'doc-upload-btn';
     uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
-    uploadBtn.onclick = function(e){
-      e.stopPropagation();
-      document.body.appendChild(fileInput);
-      fileInput.click();
-    };
+    uploadBtn.style.cursor = 'pointer';
 
     // Drag & drop on the row
     row.addEventListener('dragover', function(e){
