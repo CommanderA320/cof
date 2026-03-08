@@ -696,6 +696,29 @@ function _renderDocManager(){
     uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
     uploadBtn.onclick = function(){ fileInput.click(); };
 
+    // Drag & drop on the row
+    row.addEventListener('dragover', function(e){
+      e.preventDefault();
+      row.style.background = '#E8F1FF';
+      row.style.borderColor = '#007AFF';
+    }, false);
+    row.addEventListener('dragleave', function(){
+      row.style.background = '';
+      row.style.borderColor = '';
+    }, false);
+    row.addEventListener('drop', function(e){
+      e.preventDefault();
+      row.style.background = '';
+      row.style.borderColor = '';
+      var file = e.dataTransfer.files[0];
+      if(!file) return;
+      if(!file.name.toLowerCase().endsWith('.pdf')){
+        alert('Sadece PDF dosyası yüklenebilir.');
+        return;
+      }
+      _extractPDF(file, refCode);
+    }, false);
+
     row.appendChild(badge);
     row.appendChild(info);
     row.appendChild(uploadBtn);
@@ -703,7 +726,18 @@ function _renderDocManager(){
     wrap.appendChild(row);
     body.appendChild(wrap);
   });
+
+  // Global drop zone — drag PDF anywhere on doc manager page
+  if(!body._dropBound){
+    body._dropBound = true;
+    body.addEventListener('dragover', function(e){ e.preventDefault(); }, false);
+    body.addEventListener('drop', function(e){
+      e.preventDefault();
+      // ignore — handled by row-level drop
+    }, false);
+  }
 }
+
 
 function _showNewDocModal(){
   _openModal('+ Yeni Döküman', function(mbody, mbtns){
