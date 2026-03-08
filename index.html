@@ -1870,35 +1870,60 @@ function setExample(idx) {
 }
 
 function formatResult(text) {
-  // Main section headers
-  text = text.replace(/--- (.*?) ---/g, '<div style="margin-top:18px;margin-bottom:8px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#636366;text-transform:uppercase;display:flex;align-items:center;gap:6px;"><span style="display:block;width:10px;height:2px;background:#E30613;border-radius:2px;"></span>$1</div>');
+  // ── 1. STRIP / CONVERT MARKDOWN ──────────────────────────────────────────
 
-  // FOR-DEC subsections — F / O / R / D / E / C lines
-  text = text.replace(/^(F\s*—|O\s*—|R\s*—|D\s*—|E\s*—|C\s*—)\s*/gm, function(match, label){
-    var colors = {'F':'#007AFF','O':'#FF9500','R':'#FF3B30','D':'#E30613','E':'#34C759','C':'#5856D6'};
-    var letter = label.trim().charAt(0);
-    var col = colors[letter]||'#636366';
-    return '<span style="display:inline-block;background:'+col+';color:#fff;font-weight:800;font-size:11px;padding:2px 7px;border-radius:6px;margin-right:6px;">'+letter+'</span>';
+  // Convert markdown ## headers → section divider style (treat as --- X ---)
+  text = text.replace(/^#{1,3}\s+(.+)$/gm, function(match, title){
+    // If it already looks like a section header, normalise to --- X --- format
+    return '--- ' + title.trim().toUpperCase() + ' ---';
   });
 
-  // Risk levels
-  text = text.replace(/\bCRITICAL\b/g, '<span style="background:#1C0000;color:#FF453A;font-weight:800;padding:1px 6px;border-radius:4px;">CRITICAL</span>');
-  text = text.replace(/\bHIGH\b/g, '<span style="background:#FFF0F0;color:#D70015;font-weight:800;padding:1px 5px;border-radius:4px;">HIGH</span>');
-  text = text.replace(/\bMEDIUM\b/g, '<span style="background:#FFF8E8;color:#B25000;font-weight:800;padding:1px 5px;border-radius:4px;">MEDIUM</span>');
-  text = text.replace(/\bLOW\b/g, '<span style="background:#EDFFF4;color:#1A7A3A;font-weight:800;padding:1px 5px;border-radius:4px;">LOW</span>');
+  // Strip **bold** and __bold__
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+  text = text.replace(/__([^_]+)__/g, '$1');
 
-  // Compliance levels
-  text = text.replace(/\bSHALL\b/g, '<span style="background:#FFF8E8;color:#B25000;font-weight:800;padding:1px 5px;border-radius:4px;">SHALL</span>');
-  text = text.replace(/\bMUST\b/g, '<span style="background:#FFF0F0;color:#D70015;font-weight:800;padding:1px 5px;border-radius:4px;">MUST</span>');
+  // Strip *italic* and _italic_
+  text = text.replace(/\*([^*]+)\*/g, '$1');
+  text = text.replace(/_([^_]+)_/g, '$1');
+
+  // Strip backtick code inline
+  text = text.replace(/`([^`]+)`/g, '$1');
+
+  // ── 2. SECTION HEADERS ───────────────────────────────────────────────────
+  text = text.replace(/---\s*(.*?)\s*---/g, function(match, title){
+    return '<div style="margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #E30613;font-size:10px;font-weight:800;letter-spacing:1.8px;color:#1C1C1E;text-transform:uppercase;display:flex;align-items:center;gap:8px;"><span style="display:block;width:12px;height:12px;background:#E30613;border-radius:3px;flex-shrink:0;"></span>'+title+'</div>';
+  });
+
+  // ── 3. FOR-DEC LETTER BADGES ─────────────────────────────────────────────
+  text = text.replace(/^([FORDEC])\s*[—–-]\s*/gm, function(match, letter){
+    var colors = {'F':'#007AFF','O':'#FF9500','R':'#FF3B30','D':'#E30613','E':'#34C759','C':'#5856D6'};
+    var col = colors[letter] || '#636366';
+    return '<span style="display:inline-block;background:'+col+';color:#fff;font-weight:900;font-size:12px;padding:3px 8px;border-radius:6px;margin-right:6px;letter-spacing:0.5px;">'+letter+'</span>';
+  });
+
+  // ── 4. RISK / SEVERITY BADGES ─────────────────────────────────────────────
+  text = text.replace(/\bCRITICAL\b/g, '<span style="background:#1C0000;color:#FF453A;font-weight:800;padding:2px 6px;border-radius:4px;font-size:11px;">CRITICAL</span>');
+  text = text.replace(/\bHIGH\b/g,     '<span style="background:#FFF0F0;color:#D70015;font-weight:800;padding:2px 5px;border-radius:4px;font-size:11px;">HIGH</span>');
+  text = text.replace(/\bMEDIUM\b/g,   '<span style="background:#FFF8E8;color:#B25000;font-weight:800;padding:2px 5px;border-radius:4px;font-size:11px;">MEDIUM</span>');
+  text = text.replace(/\bLOW\b/g,      '<span style="background:#EDFFF4;color:#1A7A3A;font-weight:800;padding:2px 5px;border-radius:4px;font-size:11px;">LOW</span>');
+
+  // ── 5. COMPLIANCE LEVEL BADGES ────────────────────────────────────────────
+  text = text.replace(/\bSHALL\b/g,  '<span style="background:#FFF8E8;color:#B25000;font-weight:800;padding:1px 5px;border-radius:4px;">SHALL</span>');
+  text = text.replace(/\bMUST\b/g,   '<span style="background:#FFF0F0;color:#D70015;font-weight:800;padding:1px 5px;border-radius:4px;">MUST</span>');
   text = text.replace(/\bSHOULD\b/g, '<span style="background:#EDFFF4;color:#1A7A3A;font-weight:700;padding:1px 5px;border-radius:4px;">SHOULD</span>');
 
-  // MAYDAY highlight
-  text = text.replace(/MAYDAY/g, '<span style="background:#E30613;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:1px;">MAYDAY</span>');
+  // ── 6. SPECIAL KEYWORD BADGES ─────────────────────────────────────────────
+  text = text.replace(/MAYDAY/g, '<span style="background:#E30613;color:#fff;font-weight:900;padding:3px 10px;border-radius:5px;letter-spacing:2px;font-size:12px;">MAYDAY</span>');
+  text = text.replace(/\bCFIT\b/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:2px 6px;border-radius:4px;">CFIT</span>');
+  text = text.replace(/TIME CRITICAL \(RED\)/g, '<span style="background:#E30613;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;">TIME CRITICAL (RED)</span>');
+  text = text.replace(/TIME CRITICAL/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:2px 6px;border-radius:4px;">TIME CRITICAL</span>');
 
-  // CFIT highlight
-  text = text.replace(/\bCFIT\b/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;">CFIT</span>');
+  // ── 7. MONOSPACE BLOCKS (```...```) ──────────────────────────────────────
+  text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, function(match, code){
+    return '<div style="background:#1C1C1E;color:#E5E5EA;font-family:monospace;font-size:11px;line-height:1.6;padding:10px 12px;border-radius:8px;margin:8px 0;white-space:pre;overflow-x:auto;">'+code+'</div>';
+  });
 
-  // Newlines
+  // ── 8. NEWLINES ───────────────────────────────────────────────────────────
   text = text.replace(/\n/g, '<br>');
   return text;
 }
@@ -1954,13 +1979,14 @@ function sendQuery() {
   var userContent = 'AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\n';
   if(registration) userContent += 'REGISTRATION: '+registration+'\n';
   userContent += 'DOCS LOADED: '+(loadedDocs.length ? loadedDocs.join(', ') : 'none')+'\n\nCOMMANDER SCENARIO QUERY:\n'+input;
+  userContent += '\n\n---\nMANDATORY: Your response MUST contain ALL 8 sections in this exact order. Be concise within each section to ensure all 8 are completed:\n1. --- SCENARIO UNDERSTANDING ---\n2. --- SYSTEM ANALYSIS ---\n3. --- RISK ASSESSMENT ---\n4. --- APPLICABLE REGULATIONS ---\n5. --- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\n6. --- FOR-DEC ---\n7. --- COMMANDER DECISION ---\n8. --- CHECKLIST TRIGGERS ---\nDo not stop until all 8 sections are written. Keep each section focused and concise.';
 
   fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 6000,
       system: systemMsg,
       messages: [{role: "user", content: userContent}]
     })
