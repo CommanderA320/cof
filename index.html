@@ -693,21 +693,25 @@ function _renderDocManager(){
       +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB — ☁️ GitHub</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
       +(progress?'<div class="doc-progress">'+progress+'</div>':'');
 
-    // Hidden file input
+    // Hidden file input — must be on body for Safari click() to work
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.pdf';
-    fileInput.style.display = 'none';
+    fileInput.style.cssText = 'position:fixed;top:-999px;left:-999px;opacity:0;';
     fileInput.onchange = function(e){
       var file = e.target.files[0];
-      if(!file) return;
-      _extractPDF(file, refCode);
+      if(file) _extractPDF(file, refCode);
+      document.body.removeChild(fileInput);
     };
 
     var uploadBtn = document.createElement('button');
     uploadBtn.className = 'doc-upload-btn';
     uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
-    uploadBtn.onclick = function(){ fileInput.click(); };
+    uploadBtn.onclick = function(e){
+      e.stopPropagation();
+      document.body.appendChild(fileInput);
+      fileInput.click();
+    };
 
     // Drag & drop on the row
     row.addEventListener('dragover', function(e){
