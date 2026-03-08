@@ -208,7 +208,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 #apikey-save{background:#E30613;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
 
 /* ===== DOC MANAGER ===== */
-.doc-row{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.doc-row{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;border:2px solid transparent;transition:border-color 0.15s,background 0.15s;}
 .doc-code-badge{border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;flex-shrink:0;}
 .doc-info{flex:1;min-width:0;}
 .doc-title{font-size:13px;font-weight:600;color:#1C1C1E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -523,8 +523,21 @@ function switchEditTab(tab){
   document.getElementById('etab-docs').style.opacity = tab==='docs'?'1':'0.5';
   // hide footer in docs tab
   document.querySelector('.edit-footer').style.display = tab==='docs'?'none':'flex';
-  if(tab==='docs') _renderDocManager();
-  else _renderEditView();
+  if(tab==='docs'){
+    _renderDocManager();
+    // Preload from GitHub to show correct status
+    if(!_preloadDone){
+      _preloadDocs(
+        function(msg){
+          var storDiv = document.querySelector('#edit-body div');
+          if(storDiv) storDiv.querySelector && (storDiv.title = msg);
+        },
+        function(){ _renderDocManager(); }
+      );
+    }
+  } else {
+    _renderEditView();
+  }
 }
 
 // ===== DOCUMENT MANAGER =====
@@ -1073,6 +1086,7 @@ function _editTap(){
 // ===== EDIT OPEN/CLOSE =====
 function openEdit(){
   _editView='phases'; _editPhIdx=-1;
+  _preloadDone = false; // reset so doc status re-checks GitHub
   document.getElementById('edit-screen').className='on';
   _renderEditView();
 }
