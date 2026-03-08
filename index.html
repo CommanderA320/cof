@@ -981,7 +981,8 @@ function _getMELContext(registration){
   }
 
   if(!result.length) return '';
-  return '\n\n=== MEL DEFERRED ITEMS — REGISTRATION: '+reg+' ===\n'+result.join('\n---\n');
+  var melOut = result.join('\n---\n').substring(0, 800);
+  return '\n\n=== MEL: '+reg+' ===\n'+melOut;
 }
 
 // Build dynamic context tags for UI
@@ -2104,6 +2105,10 @@ function sendQuery() {
   userContent += 'DOCS LOADED: '+(loadedDocs.length ? loadedDocs.join(', ') : 'none')+'\n\nCOMMANDER SCENARIO QUERY:\n'+inputTrunc+contextBlock;
   userContent += '\n\n---\nMANDATORY: Your response MUST contain ALL 8 sections in this exact order. Be concise within each section to ensure all 8 are completed:\n1. --- SCENARIO UNDERSTANDING ---\n2. --- SYSTEM ANALYSIS ---\n3. --- RISK ASSESSMENT ---\n4. --- APPLICABLE REGULATIONS ---\n5. --- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\n6. --- FOR-DEC ---\n7. --- COMMANDER DECISION ---\n8. --- CHECKLIST TRIGGERS ---\nDo not stop until all 8 sections are written. Keep each section focused and concise.';
 
+  // Hard cap: keep total input under ~10000 chars (~2500 tokens)
+  if(userContent.length + systemMsg.length > 10000){
+    userContent = userContent.substring(0, 10000 - systemMsg.length);
+  }
   fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
