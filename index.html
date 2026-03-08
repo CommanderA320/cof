@@ -548,10 +548,10 @@ function _renderDocManager(){
   var used = _getStorageUsed();
   var MAX = 4500000;
   var pct = Math.min(100, Math.round(used/MAX*100));
-  var color = pct > 90 ? 'danger' : pct > 70 ? 'warn' : '';
+  var color = pct > 85 ? 'danger' : pct > 65 ? 'warn' : '';
   var storDiv = document.createElement('div');
   storDiv.style.cssText = 'padding:4px 4px 8px;';
-  storDiv.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8E8E93;margin-bottom:4px;"><span>Döküman Depolama</span><span>'+Math.round(used/1024)+' KB / '+Math.round(MAX/1024)+' KB</span></div><div class="doc-storage-bar"><div class="doc-storage-fill '+color+'" style="width:'+pct+'%"></div></div>';
+  storDiv.innerHTML = '<div style="display:flex;justify-content:space-between;font-size:10px;color:#8E8E93;margin-bottom:4px;"><span>Döküman Depolama</span><span>'+Math.round(used/1024)+' KB / '+Math.round(MAX/1024)+' KB &nbsp;(döküman başı max 550KB)</span></div><div class="doc-storage-bar"><div class="doc-storage-fill '+color+'" style="width:'+pct+'%"></div></div>';
   body.appendChild(storDiv);
 
   // Header with + New Doc button
@@ -709,29 +709,41 @@ function _extractPDF(file, docCode){
       var texts = [];
       var pageNum = 1;
 
+      // Per-doc size limit: 550KB max to stay well under 5MB total
+      var PER_DOC_MAX = 550000;
+
       function getPage(){
         if(pageNum > totalPages){
           var fullText = texts.join('\n');
-          var MAX = 4500000;
-          var used = _getStorageUsed();
-          // subtract existing if updating
-          try{ used -= (localStorage.getItem('doc_text_'+docCode)||'').length; }catch(e){}
-          if(used + fullText.length > MAX){
-            var allowed = MAX - used;
-            if(allowed < 10000){
-              _docExtractProgress[docCode] = '❌ Depolama dolu! Önce başka döküman sil.';
-              _renderDocManager(); return;
-            }
-            fullText = fullText.substring(0, allowed);
-            _docExtractProgress[docCode] = '⚠️ Alan yetersiz, '+Math.round(allowed/1024)+'KB alındı';
+
+          // Hard per-doc cap — no matter what
+          if(fullText.length > PER_DOC_MAX){
+            fullText = fullText.substring(0, PER_DOC_MAX);
+            _docExtractProgress[docCode] = '⚠️ '+Math.round(PER_DOC_MAX/1024)+'KB alındı (limit)';
           } else {
             _docExtractProgress[docCode] = '';
           }
+
+          // Try saving, handle quota error gracefully
+          var saved = false;
           try{
             localStorage.setItem('doc_text_'+docCode, fullText);
+            saved = true;
           }catch(e){
-            _docExtractProgress[docCode] = '❌ Kaydetme hatası: '+e.message;
-            _renderDocManager(); return;
+            // Quota hit — try progressively smaller chunks
+            var attempt = Math.floor(fullText.length * 0.6);
+            while(attempt > 20000){
+              try{
+                localStorage.setItem('doc_text_'+docCode, fullText.substring(0, attempt));
+                _docExtractProgress[docCode] = '⚠️ '+Math.round(attempt/1024)+'KB alındı (sıkıştırıldı)';
+                saved = true;
+                break;
+              }catch(e2){ attempt = Math.floor(attempt * 0.6); }
+            }
+            if(!saved){
+              _docExtractProgress[docCode] = '❌ Depolama dolu! Başka döküman sil.';
+              _renderDocManager(); return;
+            }
           }
           _renderDocManager();
           return;
@@ -1794,7 +1806,7 @@ function resetAll(){CK={};CT={};CP={};ap=0;xi=null;bi=null;document.getElementBy
 
 
 // ---- AI QUERY ----
-var AI_SYSTEM = "You are an expert aviation safety officer and A320 series type rated Commander with deep knowledge of Turkish Airlines Operations Manual Part-A, Airbus FCOM/FCTM, EASA CAT.OP.MPA regulations, ICAO Annex 6, MEL procedures, IATA DGR, and Weight and Balance principles.\n\nWhen a Commander describes a multi-parameter operational scenario, you must:\n\n1. RISK ASSESSMENT: Immediately identify HIGH/MEDIUM/LOW risk factors. If multiple system failures interact (electrical, hydraulic, navigation), trace the full dependency chain.\n2. REGULATORY CHECK: List specific applicable rules with exact section references (OM Part-A sections, EASA regs, ICAO annexes). If a document excerpt is provided, cite it directly.\n3. AIRCRAFT STATUS: If a registration is provided and MEL deferred items are listed for that registration, treat them as ACTIVE constraints that compound the scenario.\n4. PREREQUISITES: State what must be verified before proceeding.\n5. COMMANDER DECISION: Give a clear structured recommendation. For compounding failures, use FOR-DEC framework explicitly.\n6. CHECKLIST TRIGGERS: State which additional checklist phases get activated.\n\nFormat your response with clear sections using these exact headers:\n--- RISK FACTORS ---\n--- APPLICABLE REGULATIONS ---\n--- AIRCRAFT STATUS (MEL/DEFERRED ITEMS) ---\n--- PREREQUISITES TO VERIFY ---\n--- COMMANDER DECISION FRAMEWORK ---\n--- ADDITIONAL CHECKLIST ITEMS ---\n\nFor complex cascading failures (electrical + hydraulic + navigation), explicitly map each system dependency. Be concise, direct, operationally focused. Always reference specific section numbers. Never be vague. This is a real operational decision support tool used by airline commanders.";
+var AI_SYSTEM = "You are an expert aviation safety officer and Airbus A320 series type-rated Commander with deep knowledge of Turkish Airlines Operations Manual Part-A and Part-B, Airbus FCOM/FCTM/QRH, EASA CAT.OP.MPA regulations, ICAO Annex 6, MEL procedures, IATA DGR, and Weight & Balance principles.\n\nYou MUST structure EVERY response using ALL of the following sections in this exact order. Never skip a section. Never merge sections.\n\n--- SCENARIO UNDERSTANDING ---\nRestate the scenario in your own words. Identify the phase of flight, environment (IMC/VMC, terrain, night/day), and the sequence of events. If multiple failures occur, list them in chronological order. Confirm which MEL items are active for the registered aircraft if provided.\n\n--- SYSTEM ANALYSIS ---\nFor each failure or abnormality: trace the full technical dependency chain. Show cause → effect → downstream impact. For cascading failures (electrical + hydraulic + navigation), map each interaction explicitly. Use a step-by-step chain: 'A fails → B is lost because → C is now unavailable because...'. Identify which systems are still functional and why.\n\n--- RISK ASSESSMENT ---\nRate each risk factor: CRITICAL / HIGH / MEDIUM / LOW. Explain the interaction between concurrent risks. Identify the single most time-critical threat. State clearly if the situation is TIME CRITICAL (RED) or manageable.\n\n--- APPLICABLE REGULATIONS ---\nList specific rules with exact section references: OM Part-A chapter numbers, EASA regulation codes, ICAO annex/doc numbers. If document excerpts are provided in context, cite them directly with the section number. Be precise — never cite vaguely.\n\n--- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\nIf a registration is provided and MEL deferred items exist for that aircraft, list each active item and explain how it compounds the current scenario. State the combined operational impact.\n\n--- FOR-DEC ---\nApply the full FOR-DEC model as defined in OM Part-B:\nF — FACTS: What is actually happening? List confirmed system states.\nO — OPTIONS: List all available courses of action (minimum 3 options).\nR — RISKS & BENEFITS: For each option, state the risk and benefit. Be specific.\nD — DECISION: State the decision clearly. One sentence. No ambiguity.\nE — EXECUTION: Who does what, when, in what order. Include ATC communication, crew task sharing.\nC — CHECK: What to monitor after the decision. What indicates success or failure.\n\n--- COMMANDER DECISION ---\nState the final Commander action in plain language. This must be a direct operational order — not a discussion. Format: 'The Commander SHALL / MUST [action] because [regulatory/technical basis].'\nIf the situation requires MAYDAY declaration, state it explicitly with the exact phraseology.\n\n--- CHECKLIST TRIGGERS ---\nList which QRH/ECAM procedures apply. State the order of execution. Flag any procedures that conflict with each other in this specific configuration.\n\nRULES:\n- Always reference exact section numbers from documents provided in context\n- For cascading failures, the system dependency chain is mandatory — never skip it\n- FORDEC is mandatory for every query — not optional\n- Commander Decision must be a direct order, never vague\n- If the situation is CFIT risk, state it immediately in Scenario Understanding\n- Respond in the same language as the query (Turkish query = Turkish response, English query = English response)\n- This is a real operational tool used by airline commanders in pre-flight and in-flight decision making";
 
 function resetKey(){
   _ls('rm','thy_api_key');
@@ -1858,17 +1870,35 @@ function setExample(idx) {
 }
 
 function formatResult(text) {
-  // Format sections
-  text = text.replace(/--- (.*?) ---/g, '<div style="margin-top:14px;margin-bottom:6px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#636366;text-transform:uppercase;display:flex;align-items:center;gap:6px;"><span style="display:block;width:10px;height:2px;background:#E30613;border-radius:2px;"></span>$1</div>');
-  // Highlight risk levels
+  // Main section headers
+  text = text.replace(/--- (.*?) ---/g, '<div style="margin-top:18px;margin-bottom:8px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#636366;text-transform:uppercase;display:flex;align-items:center;gap:6px;"><span style="display:block;width:10px;height:2px;background:#E30613;border-radius:2px;"></span>$1</div>');
+
+  // FOR-DEC subsections — F / O / R / D / E / C lines
+  text = text.replace(/^(F\s*—|O\s*—|R\s*—|D\s*—|E\s*—|C\s*—)\s*/gm, function(match, label){
+    var colors = {'F':'#007AFF','O':'#FF9500','R':'#FF3B30','D':'#E30613','E':'#34C759','C':'#5856D6'};
+    var letter = label.trim().charAt(0);
+    var col = colors[letter]||'#636366';
+    return '<span style="display:inline-block;background:'+col+';color:#fff;font-weight:800;font-size:11px;padding:2px 7px;border-radius:6px;margin-right:6px;">'+letter+'</span>';
+  });
+
+  // Risk levels
+  text = text.replace(/\bCRITICAL\b/g, '<span style="background:#1C0000;color:#FF453A;font-weight:800;padding:1px 6px;border-radius:4px;">CRITICAL</span>');
   text = text.replace(/\bHIGH\b/g, '<span style="background:#FFF0F0;color:#D70015;font-weight:800;padding:1px 5px;border-radius:4px;">HIGH</span>');
   text = text.replace(/\bMEDIUM\b/g, '<span style="background:#FFF8E8;color:#B25000;font-weight:800;padding:1px 5px;border-radius:4px;">MEDIUM</span>');
   text = text.replace(/\bLOW\b/g, '<span style="background:#EDFFF4;color:#1A7A3A;font-weight:800;padding:1px 5px;border-radius:4px;">LOW</span>');
-  // Highlight SHALL/MUST/SHOULD
+
+  // Compliance levels
   text = text.replace(/\bSHALL\b/g, '<span style="background:#FFF8E8;color:#B25000;font-weight:800;padding:1px 5px;border-radius:4px;">SHALL</span>');
   text = text.replace(/\bMUST\b/g, '<span style="background:#FFF0F0;color:#D70015;font-weight:800;padding:1px 5px;border-radius:4px;">MUST</span>');
   text = text.replace(/\bSHOULD\b/g, '<span style="background:#EDFFF4;color:#1A7A3A;font-weight:700;padding:1px 5px;border-radius:4px;">SHOULD</span>');
-  // Convert newlines
+
+  // MAYDAY highlight
+  text = text.replace(/MAYDAY/g, '<span style="background:#E30613;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:1px;">MAYDAY</span>');
+
+  // CFIT highlight
+  text = text.replace(/\bCFIT\b/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:1px 6px;border-radius:4px;">CFIT</span>');
+
+  // Newlines
   text = text.replace(/\n/g, '<br>');
   return text;
 }
@@ -1930,7 +1960,7 @@ function sendQuery() {
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 1400,
+      max_tokens: 2500,
       system: systemMsg,
       messages: [{role: "user", content: userContent}]
     })
