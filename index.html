@@ -1937,6 +1937,7 @@ function checkKey(){
 function openAI() {
   document.getElementById("ai-screen").className = "on";
   checkKey();
+  _renderHistory();
 
   // Restore saved registration
   var regEl = document.getElementById('ai-reg-input');
@@ -2046,6 +2047,49 @@ function formatResult(text) {
   return text;
 }
 
+// ===== QUERY HISTORY =====
+var _queryHistory = JSON.parse(_ls('get','ai_query_history')||'[]');
+
+function _saveToHistory(q){
+  _queryHistory = _queryHistory.filter(function(x){ return x !== q; });
+  _queryHistory.unshift(q);
+  if(_queryHistory.length > 5) _queryHistory = _queryHistory.slice(0,5);
+  _ls('set','ai_query_history', JSON.stringify(_queryHistory));
+  _renderHistory();
+}
+
+function _renderHistory(){
+  var el = document.getElementById('ai-history');
+  if(!el) return;
+  if(!_queryHistory.length){ el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:1px;margin-bottom:6px;">SON SORGULAR</div>'
+    + _queryHistory.map(function(q,i){
+        return '<div onclick="useHistory('+i+')" style="cursor:pointer;padding:6px 10px;background:#F2F2F7;border-radius:8px;margin-bottom:4px;font-size:11px;color:#1C1C1E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+q.replace(/"/g,'&quot;')+'">'+q.substring(0,80)+(q.length>80?'…':'')+'</div>';
+      }).join('');
+}
+
+function useHistory(idx){
+  var q = _queryHistory[idx];
+  if(!q) return;
+  var inp = document.getElementById('ai-input');
+  inp.value = q;
+  inp.style.height = 'auto';
+  inp.style.height = inp.scrollHeight + 'px';
+  inp.focus();
+}
+
+// AbortController for stop
+var _currentAbort = null;
+
+function stopQuery(){
+  if(_currentAbort){ _currentAbort.abort(); _currentAbort = null; }
+  document.getElementById('ai-loading').className = 'ai-loading';
+  document.getElementById('ai-send-btn').style.display = 'flex';
+  document.getElementById('ai-stop-btn').style.display = 'none';
+  document.getElementById('ai-send-btn').disabled = false;
+}
+
 function sendQuery() {
   var input = document.getElementById("ai-input").value.trim();
   if (!input) return;
@@ -2054,10 +2098,13 @@ function sendQuery() {
   var regEl = document.getElementById('ai-reg-input');
   var registration = regEl ? regEl.value.trim().toUpperCase() : (_ls('get','ai_registration')||'');
   if(registration) _ls('set','ai_registration', registration);
+  _saveToHistory(input);
 
   // Show loading
   document.getElementById("ai-loading").className = "ai-loading on";
   document.getElementById("ai-result").className = "ai-result";
+  document.getElementById("ai-send-btn").style.display = "none";
+  document.getElementById("ai-stop-btn").style.display = "flex";
   document.getElementById("ai-send-btn").disabled = true;
 
   // Loaded docs list
@@ -2106,15 +2153,17 @@ function sendQuery() {
   userContent += '\n\n---\nMANDATORY: Your response MUST contain ALL 8 sections in this exact order. Be concise within each section to ensure all 8 are completed:\n1. --- SCENARIO UNDERSTANDING ---\n2. --- SYSTEM ANALYSIS ---\n3. --- RISK ASSESSMENT ---\n4. --- APPLICABLE REGULATIONS ---\n5. --- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\n6. --- FOR-DEC ---\n7. --- COMMANDER DECISION ---\n8. --- CHECKLIST TRIGGERS ---\nDo not stop until all 8 sections are written. Keep each section focused and concise.';
 
   // Hard cap: keep total input under ~10000 chars (~2500 tokens)
-  if(userContent.length + systemMsg.length > 10000){
-    userContent = userContent.substring(0, 10000 - systemMsg.length);
+  if(userContent.length + systemMsg.length > 7000){
+    userContent = userContent.substring(0, 7000 - systemMsg.length);
   }
+  _currentAbort = new AbortController();
   fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    signal: _currentAbort ? _currentAbort.signal : undefined,
     headers: {"Content-Type": "application/json", "anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31", "anthropic-dangerous-direct-browser-access": "true", "x-api-key": apiKey},
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 4000,
+      max_tokens: 6000,
       system: [
         {type: "text", text: systemMsg, cache_control: {type: "ephemeral"}}
       ],
@@ -2124,6 +2173,8 @@ function sendQuery() {
   .then(function(r) { return r.json(); })
   .then(function(data) {
     document.getElementById("ai-loading").className = "ai-loading";
+    document.getElementById("ai-send-btn").style.display = "flex";
+    document.getElementById("ai-stop-btn").style.display = "none";
     document.getElementById("ai-send-btn").disabled = false;
     var text = "";
     if (data.content && data.content[0] && data.content[0].text) {
@@ -2142,6 +2193,8 @@ function sendQuery() {
   })
   .catch(function(err) {
     document.getElementById("ai-loading").className = "ai-loading";
+    document.getElementById("ai-send-btn").style.display = "flex";
+    document.getElementById("ai-stop-btn").style.display = "none";
     document.getElementById("ai-send-btn").disabled = false;
     document.getElementById("ai-result-time").textContent = t + "Z";
     document.getElementById("ai-result-body").innerHTML = "<span style=\"color:#D70015;\">Connection error: " + err.message + "</span>";
@@ -2255,9 +2308,11 @@ _loadData(function(){
     </div>
   </div>
 
+  <div id="ai-history" style="display:none;padding:8px 16px 0;background:#fff;border-top:1px solid #E5E5EA;"></div>
   <div class="ai-input-bar">
     <div class="ai-input-row">
       <textarea class="ai-textarea" id="ai-input" placeholder="Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations..." rows="2"></textarea>
+      <button class="ai-stop-btn" id="ai-stop-btn" onclick="stopQuery()" style="display:none;background:#FF3B30;border:none;border-radius:14px;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:20px;font-weight:700;">◼</button>
       <button class="ai-send-btn" id="ai-send-btn" onclick="sendQuery()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="white"/>
