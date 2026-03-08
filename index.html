@@ -2095,7 +2095,12 @@ function sendQuery() {
 
   var userContent = 'AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\n';
   if(registration) userContent += 'REGISTRATION: '+registration+'\n';
-  userContent += 'DOCS LOADED: '+(loadedDocs.length ? loadedDocs.join(', ') : 'none')+'\n\nCOMMANDER SCENARIO QUERY:\n'+input;
+  // Truncate input to avoid rate limit — 2000 chars max
+  var inputTrunc = input;
+  if(inputTrunc.length > 2000){
+    inputTrunc = inputTrunc.substring(0, 2000) + '\n[...sorgu kısaltıldı — 2000 karakter limiti]';
+  }
+  userContent += 'DOCS LOADED: '+(loadedDocs.length ? loadedDocs.join(', ') : 'none')+'\n\nCOMMANDER SCENARIO QUERY:\n'+inputTrunc;
   userContent += '\n\n---\nMANDATORY: Your response MUST contain ALL 8 sections in this exact order. Be concise within each section to ensure all 8 are completed:\n1. --- SCENARIO UNDERSTANDING ---\n2. --- SYSTEM ANALYSIS ---\n3. --- RISK ASSESSMENT ---\n4. --- APPLICABLE REGULATIONS ---\n5. --- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\n6. --- FOR-DEC ---\n7. --- COMMANDER DECISION ---\n8. --- CHECKLIST TRIGGERS ---\nDo not stop until all 8 sections are written. Keep each section focused and concise.';
 
   fetch("https://api.anthropic.com/v1/messages", {
