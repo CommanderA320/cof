@@ -2217,9 +2217,11 @@ function sendQuery() {
           try{
             var ev = JSON.parse(data);
             if(ev.type === 'content_block_delta' && ev.delta && ev.delta.text){
+              // Hide loading on first token
+              if(!streamedText) document.getElementById("ai-loading").className = "ai-loading";
               streamedText += ev.delta.text;
-              // Live render every ~200 chars for performance
-              if(streamedText.length % 200 < 5 || ev.delta.text.includes('---')){
+              // Live render every ~150 chars or at section headers
+              if(streamedText.length % 150 < 5 || ev.delta.text.includes('---')){
                 document.getElementById("ai-result-body").innerHTML = formatResult(streamedText) + '<span class="stream-cursor">▍</span>';
               }
             }
