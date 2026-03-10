@@ -2276,6 +2276,21 @@ function formatResult(text) {
   // Remove leftover standalone --- lines
   text = text.replace(/^[ \t]*-{3,}[ \t]*$/gm, '');
 
+  // ── 9.5 APPLICABLE REGULATIONS formatting (before newline conversion) ──────
+  // Pattern: lines starting with "- " containing " | " → bold ref and title
+  // Also add blank line before each regulation item
+  text = text.replace(/^([ \t]*- )([^\n\|]+\|[^\n\|]+\|)/gm, function(match, bullet, refTitle){
+    // Split into ref | title parts and bold them
+    var parts = refTitle.split('|');
+    if(parts.length >= 2){
+      var ref = parts[0].trim();
+      var title = parts[1].trim();
+      var rest = parts.slice(2).join('|');
+      return '\n' + bullet + '<strong>' + ref + '</strong> | <strong>' + title + '</strong> |' + rest;
+    }
+    return match;
+  });
+
   // ── 10. NEWLINE → <br> ───────────────────────────────────────────────────
   text = text.replace(/\n{2,}/g, '\n');
   text = text.replace(/\n/g, '<br>');
