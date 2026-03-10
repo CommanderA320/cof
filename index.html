@@ -598,6 +598,12 @@ function _loadDocFromGitHub(docCode, cb){
       // Only store if under 4MB (localStorage limit safety)
       if(t.length < 4000000) localStorage.setItem(key, t);
     }catch(e){}
+    // Parse MSN allocation table if this doc contains one
+    try{
+      if(t.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i) > -1){
+        _parseMSNAllocationTable(t);
+      }
+    }catch(e){}
     cb && cb(null, t);
   })
   .catch(function(e){ cb && cb(e, ''); });
@@ -990,21 +996,25 @@ function _chunkDoc(docCode, docTitle, text){
   var paras = text.split(/\n{2,}|(?=\b(?:SHALL|MUST|WARNING|CAUTION|NOTE|PROCEDURE|ECAM|QRH|ACTION|IF |THEN |CHECK|STEP)\b)/i);
   var chunks = [];
   var buf = '', bufWords = 0;
+  var currentApplicability = null; // track last seen "Applicable to:" tag
   for(var i=0;i<paras.length;i++){
     var p = paras[i].trim();
     if(!p) continue;
+    // Update applicability if this para contains one
+    var applic = _parseApplicability(p);
+    if(applic !== null) currentApplicability = applic;
     var wc = p.split(/\s+/).length;
     buf += (buf ? '\n' : '') + p;
     bufWords += wc;
     if(bufWords >= 400 || i === paras.length-1){
-      chunks.push({doc:docCode, title:docTitle, text:buf});
+      chunks.push({doc:docCode, title:docTitle, text:buf, applicability:currentApplicability});
       buf=''; bufWords=0;
     }
   }
   return chunks;
 }
 
-function _bm25Score(chunk, queryTerms){
+function _bm25Score(chunk, queryTerms, aircraftMSN){
   var text = chunk.text.toLowerCase();
   var words = text.split(/\s+/);
   var N = words.length || 1;
@@ -1017,18 +1027,31 @@ function _bm25Score(chunk, queryTerms){
     var idf = Math.log(1 + (1000-1+0.5)/(tf+0.5));
     score += idf * (tf*(k1+1)) / (tf + k1*(1-b+b*N/avgdl));
   });
-  // Boost: chunk contains SHALL/MUST/WARNING/procedure keywords
+  if(score === 0) return 0;
+  // Boost: procedure keywords
   if(/\b(SHALL|MUST|WARNING|CAUTION|ECAM|QRH|ACTION|INOPERATIVE|INOP|DISPATCH|DEFERRED)\b/i.test(chunk.text)) score *= 1.4;
-  // Boost: chunk contains multiple query terms
+  // Boost: multiple query terms
   var matchCount = queryTerms.filter(function(t){ return text.indexOf(t) > -1; }).length;
   if(matchCount >= 2) score *= (1 + matchCount * 0.25);
-  // Boost: MEL item codes in chunk (XX-XX-XX format)
+  // Boost: MEL item codes
   var melInQuery = queryTerms.join(' ').match(/\d{2}-\d{2}/g);
   if(melInQuery && melInQuery.some(function(m){ return text.indexOf(m) > -1; })) score *= 2.0;
+  // MSN APPLICABILITY FILTER
+  if(chunk.applicability !== undefined && chunk.applicability !== null){
+    var _acMSN = aircraftMSN && aircraftMSN.msn ? aircraftMSN.msn : (typeof aircraftMSN === 'string' ? aircraftMSN : null);
+    var _acModel = aircraftMSN && aircraftMSN.model ? aircraftMSN.model : null;
+    if(_acMSN || _acModel){
+      if(!_msnMatchesApplicability(_acMSN, chunk.applicability, _acModel)){
+        score *= 0.05; // heavy penalty — not for this aircraft
+      } else if(chunk.applicability !== 'ALL'){
+        score *= 1.5; // boost — specifically applicable to this aircraft
+      }
+    }
+  }
   return score;
 }
 
-function _bm25Search(query, maxChunks){
+function _bm25Search(query, maxChunks, aircraftMSN){
   maxChunks = maxChunks || 20;
   var queryTerms = _tokenize(query);
   // Add aviation keyword boosts
@@ -1049,7 +1072,7 @@ function _bm25Search(query, maxChunks){
     text = _getDocText(ref.code);
     if(!text) return;
     var chunks = _chunkDoc(ref.code, ref.title, text);
-    chunks.forEach(function(c){ c.score=_bm25Score(c,queryTerms); allChunks.push(c); });
+    chunks.forEach(function(c){ c.score=_bm25Score(c,queryTerms,aircraftMSN); allChunks.push(c); });
   });
 
   // Sort by score desc
@@ -1076,7 +1099,7 @@ function _bm25Search(query, maxChunks){
 }
 
 // ===== MULTI-QUERY BM25 =====
-function _bm25MultiSearch(query) {
+function _bm25MultiSearch(query, aircraftMSN) {
   // Extract distinct failure/system terms from query for targeted sub-searches
   var subQueries = [query]; // always include full query
 
@@ -1101,7 +1124,7 @@ function _bm25MultiSearch(query) {
   var seen = {};
   var allSelected = [];
   subQueries.forEach(function(q){
-    var results = _bm25Search(q, 16);
+    var results = _bm25Search(q, 16, aircraftMSN);
     // Split results back into chunks to deduplicate
     if(results) allSelected.push({q:q, ctx:results});
   });
@@ -1112,6 +1135,258 @@ function _bm25MultiSearch(query) {
     if(ctx.length < 12000) ctx += r.ctx;
   });
   return ctx;
+}
+
+
+// ===== THY FLEET DATABASE =====
+var THY_FLEET = {
+  // A319
+  'TC-JLI':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLJ':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLK':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLL':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLM':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLN':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLO':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLP':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLR':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLS':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLT':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLU':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLV':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLY':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  'TC-JLZ':{'type':'A319','engine':'CFM56-5B5/P','mtow':75500,'mlw':62500,'mzfw':58500,'fuel_cap':26730,'seats':138,'notes':''},
+  // A320ceo (CFM)
+  'TC-JPB':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPC':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPD':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPE':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPF':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPG':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPH':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPI':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPJ':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPK':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPL':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPM':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPN':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPO':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPP':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPR':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPS':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPT':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPU':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPV':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPY':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  'TC-JPZ':{'type':'A320','engine':'CFM56-5B4/P','mtow':77000,'mlw':66000,'mzfw':62500,'fuel_cap':26730,'seats':168,'notes':''},
+  // A320neo (CFM LEAP)
+  'TC-LSA':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSB':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSC':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSD':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSE':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSF':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSG':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSH':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSI':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSJ':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSK':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSL':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSM':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSN':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSO':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSP':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSR':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSS':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LST':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSU':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  // A321ceo
+  'TC-JRA':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRB':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRC':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRD':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRE':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRF':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRG':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRH':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRI':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRJ':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRK':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRL':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRM':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRN':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRO':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRP':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRR':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRS':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRT':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRU':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRV':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRY':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  'TC-JRZ':{'type':'A321','engine':'CFM56-5B3/P','mtow':89000,'mlw':75500,'mzfw':71500,'fuel_cap':26730,'seats':199,'notes':'Center tank'},
+  // A321neo
+  'TC-LTA':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTB':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTC':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTD':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTE':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTF':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTG':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTH':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTI':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LTJ':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+};
+
+function _getAircraftInfo(registration) {
+  if(!registration) return null;
+  return THY_FLEET[registration.toUpperCase().trim()] || null;
+}
+
+// ===== MSN ALLOCATION TABLE PARSER =====
+// Called after FCOM doc is loaded — extracts Aircraft Allocation Table
+function _parseMSNAllocationTable(docText) {
+  if(!docText) return 0;
+  // Find allocation table section — search whole doc if not found in first pass
+  var tableIdx = docText.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i);
+  if(tableIdx === -1) tableIdx = 0; // search whole doc
+  var tableSection = docText.substring(tableIdx, tableIdx + 50000);
+
+  var table = {};
+  var count = 0;
+
+  // Strategy 1: MSN + optional FSN + TC-XXX + model on same line/nearby
+  // PDF text can have varied whitespace — use flexible regex
+  // Pattern: 4-6 digit MSN, anywhere on line, then TC-XXX, then 3XX-XXX model
+  var lines = tableSection.split(/\n/);
+  for(var i = 0; i < lines.length; i++){
+    var line = lines[i];
+    // Look for TC-XXX registration
+    var regMatch = line.match(/\b(TC-[A-Z]{3})\b/);
+    if(!regMatch) continue;
+    var reg = regMatch[1];
+
+    // Look for MSN: 4-6 digit number (not a year like 2024)
+    var msnMatch = line.match(/\b(0\d{4}|[1-9]\d{3,5})\b/);
+    // If not on same line, check previous line
+    if(!msnMatch && i > 0){
+      msnMatch = lines[i-1].match(/\b(0\d{4}|[1-9]\d{3,5})\b/);
+    }
+    var msn = msnMatch ? msnMatch[1] : '';
+
+    // Look for model: 3XX-XXX format (e.g. 321-231, 320-271N, 319-132)
+    var modelMatch = line.match(/\b(3(?:18|19|20|21)-\d{3}[A-Z]?)\b/);
+    // Also check next line
+    if(!modelMatch && i < lines.length-1){
+      modelMatch = lines[i+1].match(/\b(3(?:18|19|20|21)-\d{3}[A-Z]?)\b/);
+    }
+    var model = modelMatch ? modelMatch[1] : '';
+
+    if(reg && (msn || model)){
+      table[reg] = { msn: msn, model: model };
+      count++;
+    }
+  }
+
+  if(count > 0){
+    _ls('set', 'msn_allocation_table', JSON.stringify(table));
+    console.log('MSN allocation table parsed: ' + count + ' aircraft');
+  }
+  return count;
+}
+
+function _getMSNForReg(registration) {
+  if(!registration) return null;
+  try {
+    var table = JSON.parse(_ls('get','msn_allocation_table') || '{}');
+    return table[registration.toUpperCase()] || null;
+  } catch(e) { return null; }
+}
+
+// Parse applicability tag from FCOM/FCTM ("Applicable to:") or AFM ("Criteria:")
+// Returns: null (no tag found), 'ALL', {msns:[...], types:[...]} or 'ALL'
+function _parseApplicability(text) {
+  var m = text.match(/(?:Applicable\s+to|Criteria)\s*:\s*([^\n\r]{1,200})/i);
+  if(!m) return null;
+  var val = m[1].trim();
+
+  // FCOM/FCTM: "ALL"
+  if(/^ALL$/i.test(val)) return 'ALL';
+
+  // AFM: "SA" = Standard Airplane = ALL
+  if(/^SA$/i.test(val)) return 'ALL';
+
+  // FCOM/FCTM: "MSN 11464, 11622-13594"
+  if(/^MSN\s/i.test(val)) {
+    var msnPart = val.replace(/^MSN\s*/i, '');
+    var parts = msnPart.split(/[,;\s]+/).filter(Boolean);
+    var ranges = [];
+    parts.forEach(function(p){
+      var range = p.match(/^(\d+)-(\d+)$/);
+      if(range) ranges.push({from:parseInt(range[1]), to:parseInt(range[2])});
+      else if(/^\d+$/.test(p)) ranges.push({from:parseInt(p), to:parseInt(p)});
+    });
+    return ranges.length ? {msns:ranges, types:[]} : 'ALL';
+  }
+
+  // AFM: complex criteria e.g. "(((A318 or A319) and 37871) or 320-200N)"
+  // Extract aircraft type mentions
+  var types = [];
+  var typeMatches = val.match(/A3(?:18|19|20|21)(?:-\d{3}[A-Z]*)?/gi);
+  if(typeMatches) types = typeMatches.map(function(t){ return t.toUpperCase(); });
+
+  // Extract standalone MSN numbers (4-6 digits, not part of model like 320-200)
+  var msnRanges = [];
+  // Remove model numbers first (e.g. 320-200N, 321-231)
+  var stripped = val.replace(/3(?:18|19|20|21)-\d{3}[A-Z]?/g, '');
+  var numMatches = stripped.match(/\b(\d{4,6})\b/g);
+  if(numMatches){
+    numMatches.forEach(function(n){
+      msnRanges.push({from:parseInt(n), to:parseInt(n)});
+    });
+  }
+
+  if(types.length === 0 && msnRanges.length === 0) return 'ALL';
+  return {msns: msnRanges, types: types};
+}
+
+// Check if a given MSN + model matches applicability
+// aircraftInfo: {msn:'06512', model:'320-271N'} from FCOM allocation table
+function _msnMatchesApplicability(msnStr, applicability, modelStr) {
+  if(!applicability || applicability === 'ALL') return true;
+  if(!msnStr && !modelStr) return true; // unknown → include
+  var msn = parseInt(msnStr);
+
+  // Old array format (legacy)
+  if(Array.isArray(applicability)){
+    return applicability.some(function(r){ return msn >= r.from && msn <= r.to; });
+  }
+
+  // New rich format
+  if(applicability && typeof applicability === 'object'){
+    var msnMatch = true, typeMatch = true;
+    // Check MSN ranges
+    if(applicability.msns && applicability.msns.length > 0 && !isNaN(msn)){
+      msnMatch = applicability.msns.some(function(r){ return msn >= r.from && msn <= r.to; });
+    }
+    // Check type strings (e.g. "A320", "A321", "320-271N")
+    if(applicability.types && applicability.types.length > 0 && modelStr){
+      var modelUp = modelStr.toUpperCase();
+      // Extract family: "320-271N" → "A320", "321-231" → "A321"
+      var familyMatch = modelUp.match(/^(3(?:18|19|20|21))/);
+      var family = familyMatch ? 'A'+familyMatch[1] : '';
+      typeMatch = applicability.types.some(function(t){
+        return modelUp.indexOf(t.replace(/^A/,'')) > -1 || (family && t === family);
+      });
+    }
+    // If criteria has both types and MSNs, use OR logic (either match = applicable)
+    // If only one kind, just check that kind
+    var hasMSN = applicability.msns && applicability.msns.length > 0;
+    var hasType = applicability.types && applicability.types.length > 0;
+    if(hasMSN && hasType) return msnMatch || typeMatch;
+    if(hasMSN) return msnMatch;
+    if(hasType) return typeMatch;
+  }
+  return true;
 }
 
 // ===== MEL REGISTRATION PARSER =====
@@ -2102,7 +2377,7 @@ function resetAll(){CK={};CT={};CP={};ap=0;xi=null;bi=null;document.getElementBy
 
 
 // ---- AI QUERY ----
-var AI_SYSTEM = "A320 Commander + Systems Engineer. Turkish Airlines ops. MANDATORY: Before stating any system is available, trace its power source and hydraulic supply. Never assume — always verify the supply chain.\n\n=== MANDATORY FAILURE ANALYSIS PROTOCOL ===\nFor EVERY failure scenario, answer these before writing SYSTEM ANALYSIS:\n1. Which AC buses are alive? (GEN 1→AC BUS 1, GEN 2→AC BUS 2, APU GEN→either, RAT/CSM-G→AC ESS BUS)\n2. Which hydraulic systems are pressurized? (GREEN: Eng1+AC BUS1 pump, BLUE: AC ESS BUS pump+RAT, YELLOW: Eng2+AC BUS2 pump)\n3. Is RAT effective? ONLY if BLUE HYD reservoir serviceable. If BLUE RSVR LO/empty → CSM-G fails → BAT ONLY (not EMER ELEC CONFIG).\n4. Which flight computers are alive? (ELACs, SECs, FACs need specific bus)\n5. What flight law results? (Normal→Alternate→Direct based on above)\n6. Navigation status: ADIRU1/2/3 which alive? ISIS OK? FMS operative? Approach capability (CAT III/II/I/NPA/visual)?\n7. APU start possible? Why/why not? (battery charged? fire? AC available for start sequence?)\n8. Pressurization/bleed: cabin altitude climbing? EMER DESCENT required? Bleed available?\n9. Fuel system: AC BUS1/2 pumps alive? Gravity feed only? Total fuel + time to alternate?\n10. MEL compound: does current failure eliminate redundancy assumed by deferred MEL? Dispatch condition exceeded?\n11. Time constraints: battery life remaining (min)? Terrain clearance window? Fuel endurance?\n12. Communications: VHF1 (AC ESS BUS), VHF2 (AC BUS2) status? SATCOM? ATC informed? Squawk 7700?\n13. Flap/slat: SFCC1 (AC BUS1) / SFCC2 (AC BUS2) alive? Current flap position? Retract/extend possible? Landing flap available?\n14. Landing gear: LGCIU1/2 status? Normal/alternate/emergency extension available? Brake accumulator pressure?\n15. Spoilers/reversers: GREEN/YELLOW dependent - available? Landing distance penalty?\n16. Terrain/EGPWS: current MSA/MVA? EGPWS operative (AC BUS dependent)? Terrain awareness available?\n17. Weather: destination/alternate METAR/TAF? Icing conditions? Anti-ice system operative (bleed dependent)?\n18. Cabin: PAX count, special PAX (medical)? Cabin crew briefed? PAN/MAYDAY cabin announcement made?\n19. Autopilot/FD: AP1 (BLUE HYD + ELAC1), AP2 status? FD available? Manual flight required?\n20. TCAS: operative? RA possible? Traffic awareness available?\n21. CVR/FDR: recording continues on DC ESS? Preserve by not pulling CBs.\n22. Dispatcher: OFP update needed? Alternate fuel recalculated? Company notified?\n23. Destination capability: ILS/VOR available? ARFF category sufficient? Runway length with degraded braking?\n24. Crew: PF/PM assigned? Sterile cockpit declared? Task sharing adequate for workload?\n\n=== CRITICAL SYSTEM INTERDEPENDENCIES ===\n\nELECTRICAL:\n- AC BUS 1 (GEN1/APU): ADIRU1, FMGC1, ELAC1, SEC1, FAC1, BLUE elec pump, GREEN elec pump, SFCC1\n- AC BUS 2 (GEN2/APU): ADIRU2, FMGC2, ELAC2, SEC2, FAC2, YELLOW elec pump, SFCC2\n- AC ESS BUS (CSM-G/APU/GEN): ADIRU1(ess), PFD1, EFIS1, VHF1, BLUE elec pump, LGCIU1, FAC1(partial)\n- DC ESS BUS (battery/TR): ISIS, standby instruments, emer lighting, some radios\n- BOTH GEN FAIL + BLUE RSVR OK → RAT→BLUE→CSM-G→AC ESS BUS = EMER ELEC CONFIG\n- BOTH GEN FAIL + BLUE RSVR LO/empty → BAT ONLY ~30min. FMGC1+2 lost. Below 50kt: PFD1 blackout.\n- APU GEN: highest priority recovery — restores AC BUS 1 or 2, all dependent systems.\n\nHYDRAULIC:\n- GREEN (Eng1 pump + AC BUS1 elec pump): gear, normal brakes, slats, Eng1 reverser, elevator/rudder/spoilers\n- BLUE (AC ESS elec pump + RAT): CSM-G(EMER GEN), AP1, elevator/aileron/spoilers, PTU source\n- YELLOW (Eng2 pump + AC BUS2 elec pump): alternate brakes, flaps, Eng2 reverser, elevator/rudder/spoilers, PTU source\n- PTU: GREEN↔YELLOW pressure transfer (no fluid), auto at >500psi delta\n- BRAKING: Normal=GREEN+antiskid, Alternate=YELLOW+antiskid, Emergency=accumulator only(~7 apps, no antiskid)\n- REVERSERS: Eng1=GREEN, Eng2=YELLOW. Independent.\n\nFLIGHT CONTROLS / FBW:\n- ELAC1 (AC BUS1): elevator+aileron primary. ELAC2 (AC BUS2): backup\n- SEC1 (AC BUS1): spoilers+elevator backup. SEC2 (AC BUS2), SEC3 (AC ESS BUS)\n- FAC1 (AC BUS1+AC ESS): rudder+flight envelope. FAC2 (AC BUS2)\n- Normal Law: all ELACs+SECs+FACs+3 ADRs+2 IRs alive\n- Alternate Law: 2+ ADR lost, or 1 ELAC+1 SEC lost, or significant HYD loss\n- Direct Law: further degradation. No protections. Pitch=direct sidestick.\n- Mechanical backup: horizontal stabilizer trim (manual), rudder (mechanical)\n\nADR/ADIRU:\n- ADIRU1 (AC BUS1 primary, AC ESS backup): ADR1+IR1. Survives EMER ELEC CONFIG.\n- ADIRU2 (AC BUS2): ADR2+IR2. Lost with GEN2 failure if no APU.\n- ADIRU3 (AC BUS1 or 2): ADR3+IR3.\n- 1 ADR fail: Alternate Law. 2 ADR fail: Alternate Law + unreliable speed. 3 ADR fail: Direct Law + ISIS only.\n- ISIS: independent pitot/static, DC ESS BUS (battery). Survives all gen failures.\n\nENGINES/APU:\n- Engine start in flight: requires AC BUS (ignition). If BAT ONLY: windmill start may be impossible.\n- APU start: DC BAT (battery) powered starter — possible even in BAT ONLY if battery charged.\n- Single engine: remaining engine GEN covers all loads via BUS TIE.\n\nFUEL/PRESSURIZATION/BLEED:\n- Fuel pumps: AC BUS1 (left) + AC BUS2 (right). Lost buses = gravity feed only (limited).\n- Pressurization: OFV/PRV need bleed. In EMER ELEC CONFIG: cabin alt climbs if bleed lost.\n\nMEL COMPOUND RULE:\nAlways state: if MEL item X was deferred and failure Y now occurs, does Y eliminate the redundancy MEL X assumed? If yes: MEL dispatch condition is exceeded, Commander authority §8.1 applies.\n\nECAM PRIORITY RULE:\nECAM presents warnings in priority: WARNING (red) > CAUTION (amber) > ADVISORY. In compound failures, crew must sequence: 1st stabilize aircraft (Fly-Navigate-Communicate), then ECAM by level, then QRH. Never sacrifice aircraft control for checklist completion.\n\nAPPROACH DEGRADATION:\n- CAT III/II: requires dual AP, dual FD, dual ILS, normal law, full HYD. Any degradation → CAT I minimum.\n- CAT I ILS: single AP or FD, 1 ILS receiver, alternate law acceptable.\n- Non-precision/RNAV: requires FMS+ADR. ADR fail → RNAV/RNP not authorized.\n- Visual/ILS raw data: no FMS needed. ISIS airspeed acceptable. Possible in Direct Law.\n\nCONCISE RULE: Dense, no repetition, no preamble. Trace power sources explicitly.\n\nFORMAT — ALL 8 SECTIONS MANDATORY. NO preamble. NO summary header before first section. START IMMEDIATELY with --- SCENARIO UNDERSTANDING ---.\n\n--- SCENARIO UNDERSTANDING ---\nPhase, altitude, environment (day/night/IMC/VMC), terrain (CFIT risk?), aircraft reg, active failures listed sequentially, MEL items active.\n\n--- SYSTEM ANALYSIS ---\nFor EACH failure trace the full cascade: failure → affected systems → downstream effect. For EVERY system list its current state with confirmed power/hydraulic source:\nELECTRICAL: AC BUS 1 [state], AC BUS 2 [state], AC ESS [state], DC ESS [state], BAT [state].\nHYDRAULIC: GREEN [state+source], BLUE [state+source], YELLOW [state+source].\nFLIGHT CONTROLS: ELAC1/2 [state], SEC1/2/3 [state], FAC1/2 [state], flight law [Normal/Alternate/Direct/Mechanical].\nNAVIGATION: ADIRU1/2/3 [state], ISIS [state], FMS [state], approach capability [CAT III/II/I/NPA/visual].\nAPU: [start possible? why?]. ENGINES: [state].\nMEL COMPOUND: If MEL item deferred, does current failure eliminate the redundancy MEL assumed? State YES/NO and effect.\n\n--- RISK ASSESSMENT ---\nFor each risk: label CRITICAL/HIGH/MEDIUM/LOW, state TIME CRITICAL (RED) if time-limited. Include: battery time, terrain clearance, fuel state, crew workload.\n\n--- APPLICABLE REGULATIONS ---\nFor each applicable rule — give ALL THREE: (1) exact reference, (2) article title/subject, (3) full operative text of the rule as written.\nExample:\n- OM Part-A §8.3.7.1(D) | MAYDAY FUEL | \"The commander shall declare a situation of fuel emergency by broadcasting MAYDAY MAYDAY MAYDAY FUEL when the usable fuel calculated to be available upon landing at the nearest aerodrome where a safe landing can be made is less than the planned final reserve fuel.\"\n- SHY-6A Art.X | [subject] | \"[exact rule text]\"\nNever list a reference without its full rule text.\n\n--- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\nActive MEL items, validity, dispatch conditions, and compound effect with current failures.\n\n--- FOR-DEC ---\n--- F — FACTS ---\nAll confirmed facts: aircraft state, fuel, wx, terrain, crew, time constraints.\n--- O — OPTIONS ---\nExactly 3 options. For each: state action, risks, benefits, verdict (SELECTED/REJECTED + reason).\nOption 1: [action] | Risk: [X] | Benefit: [Y] | → REJECTED because [reason]\nOption 2: [action] | Risk: [X] | Benefit: [Y] | → REJECTED because [reason]\nOption 3: [action] | Risk: [X] | Benefit: [Y] | → SELECTED because [reason]\n--- R — RISKS ---\nResidual risks of selected option + mitigations.\n--- D — DECISION ---\nCommander decision: [exact action] because [primary reason].\n--- E — EXECUTION ---\n1. [ATC call] 2. [Cabin crew brief] 3. [Aircraft configuration] 4. [Sequence to resolution]\n--- C — CHECK ---\nVerify [item], confirm [item], monitor [item].\n\n--- COMMANDER DECISION ---\nCommander MUST [action] because [legal/safety basis]. If MAYDAY: MAYDAY MAYDAY MAYDAY [callsign] [emergency] [souls] [fuel] [intentions].\n\n--- CHECKLIST TRIGGERS ---\nQRH/ECAM by priority. PROCEDURE CONFLICTS: [list or None identified.]\n\nRespond in query language (TR→TR, EN→EN).";
+var AI_SYSTEM = "A319/A320/A320neo/A321/A321neo Commander + Systems Engineer. Turkish Airlines ops. ALWAYS use the exact aircraft type from REGISTRATION data provided. System architecture differences between variants are significant. MANDATORY: Before stating any system is available, trace its power source and hydraulic supply. Never assume — always verify the supply chain.\n\n=== MANDATORY FAILURE ANALYSIS PROTOCOL ===\nFor EVERY failure scenario, answer these before writing SYSTEM ANALYSIS:\n1. Which AC buses are alive? (GEN 1→AC BUS 1, GEN 2→AC BUS 2, APU GEN→either, RAT/CSM-G→AC ESS BUS)\n2. Which hydraulic systems are pressurized? (GREEN: Eng1+AC BUS1 pump, BLUE: AC ESS BUS pump+RAT, YELLOW: Eng2+AC BUS2 pump)\n3. Is RAT effective? ONLY if BLUE HYD reservoir serviceable. If BLUE RSVR LO/empty → CSM-G fails → BAT ONLY (not EMER ELEC CONFIG).\n4. Which flight computers are alive? (ELACs, SECs, FACs need specific bus)\n5. What flight law results? (Normal→Alternate→Direct based on above)\n6. Navigation status: ADIRU1/2/3 which alive? ISIS OK? FMS operative? Approach capability (CAT III/II/I/NPA/visual)?\n7. APU start possible? Why/why not? (battery charged? fire? AC available for start sequence?)\n8. Pressurization/bleed: cabin altitude climbing? EMER DESCENT required? Bleed available?\n9. Fuel system: AC BUS1/2 pumps alive? Gravity feed only? Total fuel + time to alternate?\n10. MEL compound: does current failure eliminate redundancy assumed by deferred MEL? Dispatch condition exceeded?\n11. Time constraints: battery life remaining (min)? Terrain clearance window? Fuel endurance?\n12. Communications: VHF1 (AC ESS BUS), VHF2 (AC BUS2) status? SATCOM? ATC informed? Squawk 7700?\n13. Flap/slat: SFCC1 (AC BUS1) / SFCC2 (AC BUS2) alive? Current flap position? Retract/extend possible? Landing flap available?\n14. Landing gear: LGCIU1/2 status? Normal/alternate/emergency extension available? Brake accumulator pressure?\n15. Spoilers/reversers: GREEN/YELLOW dependent - available? Landing distance penalty?\n16. Terrain/EGPWS: current MSA/MVA? EGPWS operative (AC BUS dependent)? Terrain awareness available?\n17. Weather: destination/alternate METAR/TAF? Icing conditions? Anti-ice system operative (bleed dependent)?\n18. Cabin: PAX count, special PAX (medical)? Cabin crew briefed? PAN/MAYDAY cabin announcement made?\n19. Autopilot/FD: AP1 (BLUE HYD + ELAC1), AP2 status? FD available? Manual flight required?\n20. TCAS: operative? RA possible? Traffic awareness available?\n21. CVR/FDR: recording continues on DC ESS? Preserve by not pulling CBs.\n22. Dispatcher: OFP update needed? Alternate fuel recalculated? Company notified?\n23. Destination capability: ILS/VOR available? ARFF category sufficient? Runway length with degraded braking?\n24. Crew: PF/PM assigned? Sterile cockpit declared? Task sharing adequate for workload?\n\n=== CRITICAL SYSTEM INTERDEPENDENCIES ===\n\nELECTRICAL:\n- AC BUS 1 (GEN1/APU): ADIRU1, FMGC1, ELAC1, SEC1, FAC1, BLUE elec pump, GREEN elec pump, SFCC1\n- AC BUS 2 (GEN2/APU): ADIRU2, FMGC2, ELAC2, SEC2, FAC2, YELLOW elec pump, SFCC2\n- AC ESS BUS (CSM-G/APU/GEN): ADIRU1(ess), PFD1, EFIS1, VHF1, BLUE elec pump, LGCIU1, FAC1(partial)\n- DC ESS BUS (battery/TR): ISIS, standby instruments, emer lighting, some radios\n- BOTH GEN FAIL + BLUE RSVR OK → RAT→BLUE→CSM-G→AC ESS BUS = EMER ELEC CONFIG\n- BOTH GEN FAIL + BLUE RSVR LO/empty → BAT ONLY ~30min. FMGC1+2 lost. Below 50kt: PFD1 blackout.\n- APU GEN: highest priority recovery — restores AC BUS 1 or 2, all dependent systems.\n\nHYDRAULIC:\n- GREEN (Eng1 pump + AC BUS1 elec pump): gear, normal brakes, slats, Eng1 reverser, elevator/rudder/spoilers\n- BLUE (AC ESS elec pump + RAT): CSM-G(EMER GEN), AP1, elevator/aileron/spoilers, PTU source\n- YELLOW (Eng2 pump + AC BUS2 elec pump): alternate brakes, flaps, Eng2 reverser, elevator/rudder/spoilers, PTU source\n- PTU: GREEN↔YELLOW pressure transfer (no fluid), auto at >500psi delta\n- BRAKING: Normal=GREEN+antiskid, Alternate=YELLOW+antiskid, Emergency=accumulator only(~7 apps, no antiskid)\n- REVERSERS: Eng1=GREEN, Eng2=YELLOW. Independent.\n\nFLIGHT CONTROLS / FBW:\n- ELAC1 (AC BUS1): elevator+aileron primary. ELAC2 (AC BUS2): backup\n- SEC1 (AC BUS1): spoilers+elevator backup. SEC2 (AC BUS2), SEC3 (AC ESS BUS)\n- FAC1 (AC BUS1+AC ESS): rudder+flight envelope. FAC2 (AC BUS2)\n- Normal Law: all ELACs+SECs+FACs+3 ADRs+2 IRs alive\n- Alternate Law: 2+ ADR lost, or 1 ELAC+1 SEC lost, or significant HYD loss\n- Direct Law: further degradation. No protections. Pitch=direct sidestick.\n- Mechanical backup: horizontal stabilizer trim (manual), rudder (mechanical)\n\nADR/ADIRU:\n- ADIRU1 (AC BUS1 primary, AC ESS backup): ADR1+IR1. Survives EMER ELEC CONFIG.\n- ADIRU2 (AC BUS2): ADR2+IR2. Lost with GEN2 failure if no APU.\n- ADIRU3 (AC BUS1 or 2): ADR3+IR3.\n- 1 ADR fail: Alternate Law. 2 ADR fail: Alternate Law + unreliable speed. 3 ADR fail: Direct Law + ISIS only.\n- ISIS: independent pitot/static, DC ESS BUS (battery). Survives all gen failures.\n\nENGINES/APU:\n- Engine start in flight: requires AC BUS (ignition). If BAT ONLY: windmill start may be impossible.\n- APU start: DC BAT (battery) powered starter — possible even in BAT ONLY if battery charged.\n- Single engine: remaining engine GEN covers all loads via BUS TIE.\n\nFUEL/PRESSURIZATION/BLEED:\n- Fuel pumps: AC BUS1 (left) + AC BUS2 (right). Lost buses = gravity feed only (limited).\n- Pressurization: OFV/PRV need bleed. In EMER ELEC CONFIG: cabin alt climbs if bleed lost.\n\nMEL COMPOUND RULE:\nAlways state: if MEL item X was deferred and failure Y now occurs, does Y eliminate the redundancy MEL X assumed? If yes: MEL dispatch condition is exceeded, Commander authority §8.1 applies.\n\nECAM PRIORITY RULE:\nECAM presents warnings in priority: WARNING (red) > CAUTION (amber) > ADVISORY. In compound failures, crew must sequence: 1st stabilize aircraft (Fly-Navigate-Communicate), then ECAM by level, then QRH. Never sacrifice aircraft control for checklist completion.\n\nAPPROACH DEGRADATION:\n- CAT III/II: requires dual AP, dual FD, dual ILS, normal law, full HYD. Any degradation → CAT I minimum.\n- CAT I ILS: single AP or FD, 1 ILS receiver, alternate law acceptable.\n- Non-precision/RNAV: requires FMS+ADR. ADR fail → RNAV/RNP not authorized.\n- Visual/ILS raw data: no FMS needed. ISIS airspeed acceptable. Possible in Direct Law.\n\nCONCISE RULE: Dense, no repetition, no preamble. Trace power sources explicitly.\n\nFORMAT — ALL 8 SECTIONS MANDATORY. NO preamble. NO summary header before first section. START IMMEDIATELY with --- SCENARIO UNDERSTANDING ---.\n\n--- SCENARIO UNDERSTANDING ---\nPhase, altitude, environment (day/night/IMC/VMC), terrain (CFIT risk?), aircraft reg, active failures listed sequentially, MEL items active.\n\n--- SYSTEM ANALYSIS ---\nFor EACH failure trace the full cascade: failure → affected systems → downstream effect. For EVERY system list its current state with confirmed power/hydraulic source:\nELECTRICAL: AC BUS 1 [state], AC BUS 2 [state], AC ESS [state], DC ESS [state], BAT [state].\nHYDRAULIC: GREEN [state+source], BLUE [state+source], YELLOW [state+source].\nFLIGHT CONTROLS: ELAC1/2 [state], SEC1/2/3 [state], FAC1/2 [state], flight law [Normal/Alternate/Direct/Mechanical].\nNAVIGATION: ADIRU1/2/3 [state], ISIS [state], FMS [state], approach capability [CAT III/II/I/NPA/visual].\nAPU: [start possible? why?]. ENGINES: [state].\nMEL COMPOUND: If MEL item deferred, does current failure eliminate the redundancy MEL assumed? State YES/NO and effect.\n\n--- RISK ASSESSMENT ---\nFor each risk: label CRITICAL/HIGH/MEDIUM/LOW, state TIME CRITICAL (RED) if time-limited. Include: battery time, terrain clearance, fuel state, crew workload.\n\n--- APPLICABLE REGULATIONS ---\nFor each applicable rule — give ALL THREE: (1) exact reference, (2) article title/subject, (3) full operative text of the rule as written.\nExample:\n- OM Part-A §8.3.7.1(D) | MAYDAY FUEL | \"The commander shall declare a situation of fuel emergency by broadcasting MAYDAY MAYDAY MAYDAY FUEL when the usable fuel calculated to be available upon landing at the nearest aerodrome where a safe landing can be made is less than the planned final reserve fuel.\"\n- SHY-6A Art.X | [subject] | \"[exact rule text]\"\nNever list a reference without its full rule text.\n\n--- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\nActive MEL items, validity, dispatch conditions, and compound effect with current failures.\n\n--- FOR-DEC ---\n--- F — FACTS ---\nAll confirmed facts: aircraft state, fuel, wx, terrain, crew, time constraints.\n--- O — OPTIONS ---\nExactly 3 options. For each: state action, risks, benefits, verdict (SELECTED/REJECTED + reason).\nOption 1: [action] | Risk: [X] | Benefit: [Y] | → REJECTED because [reason]\nOption 2: [action] | Risk: [X] | Benefit: [Y] | → REJECTED because [reason]\nOption 3: [action] | Risk: [X] | Benefit: [Y] | → SELECTED because [reason]\n--- R — RISKS ---\nResidual risks of selected option + mitigations.\n--- D — DECISION ---\nCommander decision: [exact action] because [primary reason].\n--- E — EXECUTION ---\n1. [ATC call] 2. [Cabin crew brief] 3. [Aircraft configuration] 4. [Sequence to resolution]\n--- C — CHECK ---\nVerify [item], confirm [item], monitor [item].\n\n--- COMMANDER DECISION ---\nCommander MUST [action] because [legal/safety basis]. If MAYDAY: MAYDAY MAYDAY MAYDAY [callsign] [emergency] [souls] [fuel] [intentions].\n\n--- CHECKLIST TRIGGERS ---\nQRH/ECAM by priority. PROCEDURE CONFLICTS: [list or None identified.]\n\nRespond in query language (TR→TR, EN→EN).";
 
 function resetKey(){
   _ls('rm','thy_api_key');
@@ -2160,6 +2435,21 @@ function openAI() {
       function(){ _updateDocTags(); }
     );
   }
+  // Parse MSN allocation table from any already-cached FCOM doc
+  (function(){
+    try {
+      var existing = JSON.parse(_ls('get','msn_allocation_table')||'{}');
+      if(Object.keys(existing).length > 0) return; // already parsed
+      // Search all loaded docs for Aircraft Allocation Table
+      REFERENCES.forEach(function(ref){
+        var txt = _getDocText(ref.code);
+        if(txt && txt.length > 1000 && txt.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i) > -1){
+          var n = _parseMSNAllocationTable(txt);
+          if(n > 0) console.log('MSN table parsed from: '+ref.code+' ('+n+' entries)');
+        }
+      });
+    } catch(e){}
+  })();
 
   document.getElementById("ai-input").focus();
 }
@@ -2536,7 +2826,10 @@ function sendQuery() {
   // BM25: pick most relevant chunks from loaded docs
   var docContext = '';
   var melContext = '';
-  try { docContext = _bm25MultiSearch(input); } catch(e) { console.error('BM25 error:', e); }
+  // Inject MSN into query so FCOM/AFM/FCTM chunks with that MSN get boosted
+  var msnData = _getMSNForReg(registration);
+  var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
+  try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
   try { melContext = _getMELContext(registration); } catch(e) { console.error('MEL error:', e); }
 
   var systemMsg = AI_SYSTEM;
@@ -2549,7 +2842,41 @@ function sendQuery() {
   }
 
   var userContent = 'AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\n';
-  if(registration) userContent += 'REGISTRATION: '+registration+'. MEL deferred items for this registration are ACTIVE constraints.\n';
+  var acInfo = _getAircraftInfo(registration);
+  var msnInfo = _getMSNForReg(registration); // from parsed FCOM allocation table
+  if(registration){
+    var typeStr = '';
+    var msnStr = '';
+    if(msnInfo){
+      msnStr = msnInfo.msn;
+      typeStr = msnInfo.model; // e.g. "320-271N" or "321-231"
+    } else if(acInfo){
+      typeStr = acInfo.type;
+    }
+    userContent += 'REGISTRATION: '+registration;
+    if(msnStr) userContent += ' | MSN: '+msnStr;
+    if(typeStr) userContent += ' | MODEL: '+typeStr;
+    if(acInfo) userContent += ' | ENGINE: '+acInfo.engine;
+    userContent += '\n';
+    if(acInfo){
+      userContent += 'WEIGHTS: MTOW '+acInfo.mtow+'kg | MLW '+acInfo.mlw+'kg | MZFW '+acInfo.mzfw+'kg\n';
+      userContent += 'FUEL CAPACITY: '+acInfo.fuel_cap+'L | PAX CONFIG: '+acInfo.seats+' seats\n';
+      if(acInfo.notes) userContent += 'AIRCRAFT NOTES: '+acInfo.notes+'\n';
+    }
+    // Type-specific notes for model
+    var modelUpper = typeStr.toUpperCase();
+    if(modelUpper.indexOf('321') > -1){
+      userContent += 'TYPE SPECIFIC: A321 — CENTER TANK present (additional fuel system). MTOW/MLW significantly higher than A320. Landing performance calculations differ. Fuel pump config: L+R+CTR tanks.\n';
+    } else if(modelUpper.indexOf('319') > -1){
+      userContent += 'TYPE SPECIFIC: A319 — Lower capacity/range variant. MEL items may differ from A320 base.\n';
+    }
+    if(modelUpper.indexOf('NEO') > -1 || modelUpper.indexOf('271') > -1 || modelUpper.indexOf('251') > -1 || modelUpper.indexOf('232') > -1){
+      userContent += 'TYPE SPECIFIC: NEO variant — CFM LEAP engines. Engine start/FADEC procedures differ from CEO.\n';
+    }
+    userContent += 'MEL deferred items for this registration are ACTIVE constraints.\n';
+    // MSN context for BM25 boost — add to query terms
+    if(msnStr) userContent += 'MSN FOR DOC MATCHING: '+msnStr+'\n';
+  }
   // Truncate input to avoid rate limit — 2000 chars max
   var inputTrunc = input;
   if(inputTrunc.length > 2000){
