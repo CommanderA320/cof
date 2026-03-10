@@ -2674,8 +2674,10 @@ function formatResult(text) {
   // SELECTED/SEÇİLDİ → green badge, REJECTED/REDDEDİLDİ → red badge
   var _greenBadge = '<span style="background:#1A7A3A;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">$&</span>';
   var _redBadge   = '<span style="background:#D70015;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">$&</span>';
+  var _blueBadge  = '<span style="background:#0066CC;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">$&</span>';
   text = text.replace(/\b(SELECTED|SEÇİLDİ)\b/g, _greenBadge);
   text = text.replace(/\b(REJECTED|REDDEDİLDİ)\b/g, _redBadge);
+  text = text.replace(/\b(DEĞERLENDİRİLDİ)\b/g, _blueBadge);
   // Option N: → bold + separator line before each
   text = text.replace(/(^|\n)(Option\s+\d+\s*:)/g, function(m, pre, opt){
     var sep = pre === '\n' ? '<br><hr style="border:none;border-top:1px solid #F2F2F7;margin:8px 0;">' : '';
