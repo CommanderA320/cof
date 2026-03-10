@@ -735,11 +735,16 @@ function _renderDocManager(){
       row.style.borderColor = '';
       var file = e.dataTransfer.files[0];
       if(!file) return;
-      if(!file.name.toLowerCase().endsWith('.pdf')){
-        alert('Sadece PDF dosyası yüklenebilir.');
+      var fname = file.name.toLowerCase();
+      if(!fname.endsWith('.pdf') && !fname.endsWith('.xml')){
+        alert('Sadece PDF veya XML dosyası yüklenebilir.');
         return;
       }
-      _extractPDF(file, refCode);
+      if(fname.endsWith('.xml')){
+        _extractXML(file, refCode);
+      } else {
+        _extractPDF(file, refCode);
+      }
     }, false);
 
     row.appendChild(badge);
