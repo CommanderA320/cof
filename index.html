@@ -2221,8 +2221,16 @@ function formatResult(text) {
     return html;
   });
 
-  // ── 9. NEWLINES ───────────────────────────────────────────────────────────
+  // ── 9. CLEAN UP BEFORE NEWLINES ──────────────────────────────────────────
+  // Remove any remaining standalone --- lines (must happen before newline conversion)
+  text = text.replace(/^[ \t]*-{2,}[ \t]*$/gm, '');
+  // Collapse 3+ consecutive blank lines into max 1
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  // ── 10. NEWLINES ──────────────────────────────────────────────────────────
   text = text.replace(/\n/g, '<br>');
+  // Collapse 3+ consecutive <br> into max 2
+  text = text.replace(/(<br>){3,}/g, '<br><br>');
   return text;
 }
 
