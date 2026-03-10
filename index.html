@@ -2864,15 +2864,17 @@ function sendQuery() {
   var docContext = '';
   var melContext = '';
   // Inject MSN into query so FCOM/AFM/FCTM chunks with that MSN get boosted
-  // If MSN table not yet parsed, try now silently
-  if(!_ls('get','msn_allocation_table') || _ls('get','msn_allocation_table') === '{}'){
+  // Try to get MSN — if not found, re-scan all docs (stale/partial cache)
+  var msnData = _getMSNForReg(registration);
+  if(!msnData && registration){
+    _ls('set','msn_allocation_table','{}'); // clear stale cache
     REFERENCES.forEach(function(ref){
       var txt = _getDocText(ref.code);
       if(txt && txt.length > 100) _parseMSNAllocationTable(txt);
     });
+    msnData = _getMSNForReg(registration);
     setTimeout(_updateRegBadge, 100);
   }
-  var msnData = _getMSNForReg(registration);
   var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
   try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
   try { melContext = _getMELContext(registration); } catch(e) { console.error('MEL error:', e); }
