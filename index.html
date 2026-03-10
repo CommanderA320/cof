@@ -2232,10 +2232,13 @@ function formatResult(text) {
   text = text.replace(/\bSHOULD\b/g, '<span style="background:#EDFFF4;color:#1A7A3A;font-weight:700;padding:1px 5px;border-radius:4px;">SHOULD</span>');
 
   // ── 6. SPECIAL KEYWORD BADGES ─────────────────────────────────────────────
-  text = text.replace(/MAYDAY/g, '<span style="background:#E30613;color:#fff;font-weight:900;padding:3px 10px;border-radius:5px;letter-spacing:2px;font-size:12px;">MAYDAY</span>');
-  text = text.replace(/\bCFIT\b/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:2px 6px;border-radius:4px;">CFIT</span>');
+  text = text.replace(/MAYDAY/g, '<strong style="color:#E30613;font-weight:900;">MAYDAY</strong>');
+  text = text.replace(/\bCFIT\b/g, '<strong style="color:#E30613;font-weight:900;">CFIT</strong>');
   text = text.replace(/TIME CRITICAL \(RED\)/g, '<span style="background:#E30613;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;">TIME CRITICAL (RED)</span>');
   text = text.replace(/TIME CRITICAL/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:2px 6px;border-radius:4px;">TIME CRITICAL</span>');
+  // SELECTED → green badge, REJECTED → red badge (single pass to avoid double-wrap)
+  text = text.replace(/\bSELECTED\b/g, '<span style="background:#1A7A3A;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">SELECTED</span>');
+  text = text.replace(/\bREJECTED\b/g, '<span style="background:#D70015;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">REJECTED</span>');
 
   // ── 7. MONOSPACE BLOCKS (```...```) ──────────────────────────────────────
   text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, function(match, code){
@@ -2391,7 +2394,7 @@ function sendQuery() {
     inputTrunc = inputTrunc.substring(0, 2000) + '\n[...sorgu kısaltıldı — 2000 karakter limiti]';
   }
   userContent += 'DOCS LOADED: '+(loadedDocs.length ? loadedDocs.join(', ') : 'none')+'\n\nCOMMANDER SCENARIO QUERY:\n'+inputTrunc+contextBlock;
-  userContent += '\n\n---\nMANDATORY: ALL 8 sections in exact order. No preamble. Start immediately with --- SCENARIO UNDERSTANDING ---:\n1. --- SCENARIO UNDERSTANDING ---\n2. --- SYSTEM ANALYSIS --- (trace ALL systems: ELEC/HYD/FBW/NAV/APU)\n3. --- RISK ASSESSMENT ---\n4. --- APPLICABLE REGULATIONS --- (each ref MUST include full rule text)\n5. --- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\n6. --- FOR-DEC --- then sub-sections --- F — FACTS --- / --- O — OPTIONS --- / --- R — RISKS --- / --- D — DECISION --- / --- E — EXECUTION --- / --- C — CHECK ---\n7. --- COMMANDER DECISION ---\n8. --- CHECKLIST TRIGGERS ---';
+  userContent += '\n\n---\nMANDATORY: ALL 8 sections in exact order. No preamble. Start immediately with --- SCENARIO UNDERSTANDING ---:\n1. --- SCENARIO UNDERSTANDING ---\n2. --- SYSTEM ANALYSIS --- (trace ALL systems: ELEC/HYD/FBW/NAV/APU)\n3. --- RISK ASSESSMENT ---\n4. --- APPLICABLE REGULATIONS --- (each ref MUST include full rule text, blank line between each regulation)\n5. --- AIRCRAFT STATUS (MEL / DEFERRED ITEMS) ---\n6. --- FOR-DEC --- then sub-sections --- F — FACTS --- / --- O — OPTIONS --- / --- R — RISKS --- / --- D — DECISION --- / --- E — EXECUTION --- / --- C — CHECK ---\n7. --- COMMANDER DECISION ---\n8. --- CHECKLIST TRIGGERS ---';
 
   // Hard cap: total context ~30000 chars (well within claude-sonnet-4-6 context)
   // systemMsg ~5400, userContent can be up to ~24000 chars safely
