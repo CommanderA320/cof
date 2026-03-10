@@ -186,6 +186,8 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-result-body .risk-MED{color:#B25000;font-weight:700;}
 .ai-result-body .risk-OK{color:#1A7A3A;font-weight:700;}
 .ai-loading{display:none;flex-direction:column;align-items:center;padding:40px 20px;}
+.ai-section-hdr{margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #E30613;font-size:10px;font-weight:800;letter-spacing:1.8px;color:#1C1C1E;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.ai-section-dot{display:block;width:12px;height:12px;background:#E30613;border-radius:3px;flex-shrink:0;}
 .stream-cursor{display:inline-block;animation:blink 0.7s infinite;color:#E30613;font-weight:700;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
 .ai-loading.on{display:flex;}
@@ -2160,14 +2162,14 @@ function formatResult(text) {
   text = text.replace(/`/g, '');
 
   // ── 2. SECTION HEADERS ───────────────────────────────────────────────────
-  // Only match --- TITLE --- where title has real content (3+ chars)
-  text = text.replace(/---[ \t]*([^\n\-]{3,}?)[ \t]*---/g, function(match, title){
+  // Step 1: Convert named sections: --- TITLE ---
+  text = text.replace(/---[ \t]*([^\n\r\-]{2,}?)[ \t]*---/g, function(match, title){
     title = title.trim();
     if(!title) return '';
-    return '<div style="margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #E30613;font-size:10px;font-weight:800;letter-spacing:1.8px;color:#1C1C1E;text-transform:uppercase;display:flex;align-items:center;gap:8px;"><span style="display:block;width:12px;height:12px;background:#E30613;border-radius:3px;flex-shrink:0;"></span>'+title+'</div>';
+    return '<div class="ai-section-hdr"><span class="ai-section-dot"></span>'+title+'</div>';
   });
-  // Remove leftover standalone --- separator lines
-  text = text.replace(/^[ \t]*---[ \t]*$/gm, '<hr style="border:none;border-top:1px solid #E5E5EA;margin:8px 0;">');
+  // Step 2: Remove standalone --- lines (entire line is just dashes/spaces)
+  text = text.replace(/^[ \t]*-{2,}[ \t]*$/gm, '');
 
 
   // ── 3. FOR-DEC LETTER BADGES ─────────────────────────────────────────────
