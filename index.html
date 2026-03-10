@@ -2162,16 +2162,14 @@ function formatResult(text) {
   text = text.replace(/`/g, '');
 
   // ── 2. SECTION HEADERS ───────────────────────────────────────────────────
-  // Convert named sections: --- TITLE --- (greedy title capture)
+  // Named sections: --- TITLE ---
   text = text.replace(/---[ \t]*([^\n\r\-]{2,}?)[ \t]*---/g, function(match, title){
     title = title.trim();
-    if(!title) return '\n';
-    return '\n<div class="ai-section-hdr"><span class="ai-section-dot"></span>'+title+'</div>\n';
+    if(!title) return '';
+    return '<div class="ai-section-hdr"><span class="ai-section-dot"></span>'+title+'</div>';
   });
-  // NUCLEAR: remove ALL remaining sequences of 3+ dashes (separators, orphans)
-  text = text.replace(/-{3,}/g, '');
-  // Remove lines that are now empty or just spaces after above
-  text = text.replace(/^[ \t]+$/gm, '');
+  // Remove ONLY lines that are purely dashes (^---$), nothing else
+  text = text.replace(/^[ \t]*-{2,}[ \t]*$/gm, '');
 
 
   // ── 3. FOR-DEC LETTER BADGES ─────────────────────────────────────────────
@@ -2224,15 +2222,14 @@ function formatResult(text) {
   });
 
   // ── 9. CLEAN UP BEFORE NEWLINES ──────────────────────────────────────────
-  // Remove any remaining standalone --- lines (must happen before newline conversion)
-  text = text.replace(/^[ \t]*-{2,}[ \t]*$/gm, '');
-  // Collapse 3+ consecutive blank lines into max 1
+  // Collapse 3+ consecutive blank lines into max 2
   text = text.replace(/\n{3,}/g, '\n\n');
 
   // ── 10. NEWLINES ──────────────────────────────────────────────────────────
   text = text.replace(/\n/g, '<br>');
-  // Remove any -- sequences that survived into HTML (safety net)
-  text = text.replace(/(?<![<a-zA-Z0-9"'=-])-{2,}(?![->a-zA-Z0-9"'])/g, '');
+  // After <br> conversion, remove <br>---<br> patterns (standalone dash lines)
+  text = text.replace(/(<br>[ \t]*-{2,}[ \t]*)+<br>/g, '<br>');
+  text = text.replace(/^[ \t]*-{2,}[ \t]*<br>/g, '');
   // Collapse excess <br> (max 2 consecutive)
   text = text.replace(/(<br>){3,}/g, '<br><br>');
   // Strip preamble: remove any text before the first section header
