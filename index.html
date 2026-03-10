@@ -2349,6 +2349,153 @@ function stopQuery(){
   document.getElementById('ai-send-btn').disabled = false;
 }
 
+function openReport(printNow) {
+  var bodyHTML = document.getElementById('ai-result-body').innerHTML;
+  var timeEl = document.getElementById('ai-result-time');
+  var timestamp = timeEl ? timeEl.textContent : '';
+  var regEl = document.getElementById('ai-reg-input');
+  var reg = regEl ? regEl.value.trim().toUpperCase() : '';
+  var query = document.getElementById('ai-input') ? document.getElementById('ai-input').value.trim() : '';
+
+  var win = window.open('', '_blank');
+  if(!win) return;
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>COF Operational Assessment ${timestamp}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',system-ui,sans-serif;background:#fff;color:#1C1C1E;font-size:12px;line-height:1.6;}
+
+  /* PAGE */
+  @page{size:A4;margin:18mm 16mm 18mm 16mm;}
+  @media print{
+    body{font-size:11px;}
+    .no-print{display:none!important;}
+    .page-break{page-break-before:always;}
+  }
+
+  /* HEADER */
+  .report-header{background:#1C1C1E;color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}
+  .report-brand{font-size:16px;font-weight:900;letter-spacing:3px;color:#E30613;}
+  .report-sub{font-size:9px;color:#8E8E93;letter-spacing:1.5px;margin-top:2px;}
+  .report-meta{text-align:right;font-size:10px;color:#8E8E93;line-height:1.8;}
+  .report-meta strong{color:#fff;}
+
+  /* RED STRIPE */
+  .report-stripe{height:4px;background:#E30613;margin-bottom:20px;}
+
+  /* QUERY BOX */
+  .query-box{background:#F2F2F7;border-left:3px solid #E30613;padding:10px 14px;margin-bottom:20px;border-radius:0 6px 6px 0;}
+  .query-label{font-size:9px;font-weight:800;color:#E30613;letter-spacing:1.5px;margin-bottom:4px;}
+  .query-text{font-size:11px;color:#1C1C1E;line-height:1.5;}
+
+  /* SECTION HEADERS */
+  .ai-section-hdr{display:flex;align-items:center;gap:8px;margin-top:18px;margin-bottom:6px;padding-bottom:5px;border-bottom:2px solid #E30613;font-size:9px;font-weight:800;letter-spacing:1.8px;color:#1C1C1E;text-transform:uppercase;}
+  .ai-section-dot{display:block;width:10px;height:10px;background:#E30613;border-radius:2px;flex-shrink:0;}
+
+  /* BODY */
+  .report-body{padding:0 4px;}
+
+  /* TABLES */
+  table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;}
+  th{background:#1C1C1E;color:#fff;font-weight:700;padding:5px 8px;text-align:left;}
+  td{padding:4px 8px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+
+  /* BADGES */
+  .badge-crit{background:#1C0000;color:#FF453A;font-weight:800;padding:1px 5px;border-radius:3px;font-size:10px;}
+  .badge-high{background:#FFF0F0;color:#D70015;font-weight:800;padding:1px 5px;border-radius:3px;font-size:10px;}
+  .badge-med{background:#FFF8E8;color:#B25000;font-weight:800;padding:1px 5px;border-radius:3px;font-size:10px;}
+  .badge-low{background:#EDFFF4;color:#1A7A3A;font-weight:800;padding:1px 5px;border-radius:3px;font-size:10px;}
+  .badge-sel{background:#1A7A3A;color:#fff;font-weight:800;padding:1px 6px;border-radius:3px;font-size:10px;}
+  .badge-rej{background:#D70015;color:#fff;font-weight:800;padding:1px 6px;border-radius:3px;font-size:10px;}
+
+  /* FOOTER */
+  .report-footer{margin-top:24px;padding-top:10px;border-top:1px solid #E5E5EA;font-size:9px;color:#8E8E93;display:flex;justify-content:space-between;}
+
+  /* PRINT BUTTON */
+  .print-bar{background:#1C1C1E;padding:10px 16px;display:flex;gap:8px;position:sticky;top:0;z-index:100;}
+  .print-btn{background:#E30613;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;}
+  .close-btn{background:#3A3A3C;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="no-print print-bar">
+  <button class="print-btn" onclick="window.print()">⬇ PDF Kaydet / Yazdır</button>
+  <button class="close-btn" onclick="window.close()">✕ Kapat</button>
+</div>
+
+<div class="report-header">
+  <div>
+    <div class="report-brand">COF</div>
+    <div class="report-sub">COMMANDER OPERATIONAL FLOW — TURKISH AIRLINES A320</div>
+  </div>
+  <div class="report-meta">
+    <div><strong>OPERATIONAL ASSESSMENT</strong></div>
+    <div>${timestamp || new Date().toISOString().substring(0,16).replace('T',' ')}Z</div>
+    ${reg ? '<div>REG: <strong>' + reg + '</strong></div>' : ''}
+  </div>
+</div>
+<div class="report-stripe"></div>
+
+<div style="padding:0 20px 20px;">
+  ${query ? '<div class="query-box"><div class="query-label">SENARYO SORGUSU</div><div class="query-text">' + query.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div></div>' : ''}
+  <div class="report-body">${bodyHTML}</div>
+  <div class="report-footer">
+    <span>COF — Commander Operational Flow</span>
+    <span>Capt. Bahadır ÜNSAL — Turkish Airlines A320</span>
+    <span>${timestamp || ''}Z</span>
+  </div>
+</div>
+
+</body>
+</html>`);
+  win.document.close();
+  if(printNow){
+    win.onload = function(){ win.print(); };
+  }
+}
+
+function shareReport() {
+  var timeEl = document.getElementById('ai-result-time');
+  var timestamp = timeEl ? timeEl.textContent : '';
+  var regEl = document.getElementById('ai-reg-input');
+  var reg = regEl ? regEl.value.trim().toUpperCase() : '';
+  var query = (document.getElementById('ai-input') || {}).value || '';
+  var bodyEl = document.getElementById('ai-result-body');
+  var bodyText = bodyEl ? bodyEl.innerText : '';
+
+  var title = 'COF Operational Assessment' + (reg ? ' — ' + reg : '') + (timestamp ? ' ' + timestamp + 'Z' : '');
+  var text = (query ? 'SENARYO: ' + query.trim() + '\n\n' : '') + bodyText;
+
+  if(navigator.share){
+    navigator.share({ title: title, text: text })
+      .catch(function(e){ if(e.name !== 'AbortError') alert('Paylaşım hatası: ' + e.message); });
+  } else {
+    // Fallback: copy to clipboard
+    var full = title + '\n\n' + text;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(full).then(function(){
+        alert('Rapor panoya kopyalandı. WhatsApp veya e-postaya yapıştırabilirsiniz.');
+      });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = full;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      alert('Rapor panoya kopyalandı.');
+    }
+  }
+}
+
 function sendQuery() {
   var input = document.getElementById("ai-input").value.trim();
   if (!input) return;
@@ -2466,6 +2613,9 @@ function sendQuery() {
       document.getElementById("ai-send-btn").disabled = false;
       // Final render
       document.getElementById("ai-result-body").innerHTML = formatResult(streamedText);
+      // Show PDF/Share buttons
+      var actEl = document.getElementById("ai-result-actions");
+      if(actEl){ actEl.style.display = "flex"; }
     }
 
     function _read(){
@@ -2614,6 +2764,11 @@ _loadData(function(){
       <div class="ai-result-header">
         <div class="ai-result-title">OPERATIONAL ASSESSMENT</div>
         <div class="ai-result-time" id="ai-result-time"></div>
+      </div>
+      <div id="ai-result-actions" style="display:none;padding:10px 16px 0;gap:8px;flex-wrap:wrap;">
+        <button onclick="openReport(false)" style="background:#1C1C1E;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">📄 Rapor Görüntüle</button>
+        <button onclick="openReport(true)" style="background:#E30613;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">⬇ PDF Kaydet</button>
+        <button onclick="shareReport()" style="background:#007AFF;color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">↑ Paylaş</button>
       </div>
       <div class="ai-result-body" id="ai-result-body"></div>
     </div>
