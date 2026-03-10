@@ -2203,7 +2203,7 @@ function formatResult(text) {
   // Remove any remaining orphan backticks
   text = text.replace(/`/g, '');
 
-  // ── 2. PREAMBLE STRIP + SECTION HEADERS (text-level, before newline conversion) ──
+  // ── 2. PREAMBLE STRIP ───────────────────────────────────────────────────
   var knownSections = ['SCENARIO UNDERSTANDING','SYSTEM ANALYSIS','RISK ASSESSMENT','APPLICABLE REGULATIONS','AIRCRAFT STATUS','FOR-DEC','COMMANDER DECISION','CHECKLIST TRIGGERS','F — FACTS','O — OPTIONS','R — RISKS','D — DECISION','E — EXECUTION','C — CHECK'];
   var firstRealIdx = -1;
   knownSections.forEach(function(s){
@@ -2211,15 +2211,6 @@ function formatResult(text) {
     if(idx !== -1 && (firstRealIdx === -1 || idx < firstRealIdx)) firstRealIdx = idx;
   });
   if(firstRealIdx > 0) text = text.slice(firstRealIdx);
-
-  // Convert --- TITLE --- to placeholder (title may contain single dashes: FOR-DEC, 22-70-01B)
-  text = text.replace(/---[ \t]*((?:(?!---)[^\n\r]){2,}?)[ \t]*---/g, function(match, title){
-    title = title.trim();
-    if(!title) return '';
-    return '\n<SECTIONHDR>'+title+'</SECTIONHDR>\n';
-  });
-  // Remove standalone dash-only lines
-  text = text.replace(/^[ \t]*-{3,}[ \t]*$/gm, '');
 
 
   // ── 3. FOR-DEC LETTER BADGES ─────────────────────────────────────────────
@@ -2251,14 +2242,15 @@ function formatResult(text) {
     return '<div style="background:#1C1C1E;color:#E5E5EA;font-family:monospace;font-size:11px;line-height:1.6;padding:10px 12px;border-radius:8px;margin:8px 0;white-space:pre;overflow-x:auto;">'+code+'</div>';
   });
 
-  // ── 8. MARKDOWN TABLES (must run before \n→<br>) ───────────────────────
+  // ── 8. MARKDOWN TABLES — must run BEFORE section header conversion ─────────
   text = text.replace(/((?:[ \t]*\|.+\|[ \t]*\n)+)/g, function(block){
     var rows = block.trim().split('\n').filter(function(r){ return r.trim(); });
     if(rows.length < 1) return block;
     var html = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;">';
     var isFirst = true;
     rows.forEach(function(row){
-      if(/^\s*\|[-:\s|]+\|\s*$/.test(row)) return; // skip separator rows (|---|---|)
+      // Skip separator rows: lines like |---|---|---| or |:---|:---:|
+      if(/^\s*\|[-:\s|]+\|\s*$/.test(row)) return;
       var cells = row.split('|').filter(function(c,i,a){ return i>0 && i<a.length-1; });
       if(!cells.length) return;
       var tag = isFirst ? 'th' : 'td';
@@ -2269,25 +2261,29 @@ function formatResult(text) {
       isFirst = false;
     });
     html += '</table>';
-    return html;
+    return html + '\n';
   });
 
-  // ── 9. NEWLINE CONVERSION (after all text-level processing) ──────────────
-  // Collapse multiple blank lines to one
+  // ── 9. SECTION HEADERS — after tables so |---| rows are already consumed ─
+  text = text.replace(/---[ \t]*((?:(?!---)[^\n\r]){2,}?)[ \t]*---/g, function(match, title){
+    title = title.trim();
+    if(!title) return '';
+    return '\n<SECTIONHDR>'+title+'</SECTIONHDR>\n';
+  });
+  // Remove leftover standalone --- lines
+  text = text.replace(/^[ \t]*-{3,}[ \t]*$/gm, '');
+
+  // ── 10. NEWLINE → <br> ───────────────────────────────────────────────────
   text = text.replace(/\n{2,}/g, '\n');
-  // Convert \n to <br>
   text = text.replace(/\n/g, '<br>');
-  // Clean up any --- that survived as <br>---<br>
-  text = text.replace(/(<br>)*[ \t]*-{2,}[ \t]*(<br>)+/g, '<br>');
   // Replace section header placeholders
   text = text.replace(/<SECTIONHDR>(.*?)<\/SECTIONHDR>/g, function(m, title){
     return '<div class="ai-section-hdr"><span class="ai-section-dot"></span>'+title+'</div>';
   });
-  // Remove <br> before section headers (header has its own margin)
+  // Remove <br> immediately before/after section headers
   text = text.replace(/(<br>)+(<div class="ai-section-hdr">)/g, '$2');
-  // Remove <br> after section headers
   text = text.replace(/(<div class="ai-section-hdr">[^<]*<\/div>)(<br>)+/g, '$1');
-  // Collapse remaining multiple <br> to single
+  // Collapse remaining multiple <br>
   text = text.replace(/(<br>){2,}/g, '<br>');
   return text;
 }
