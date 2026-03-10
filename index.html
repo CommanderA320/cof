@@ -698,12 +698,18 @@ function _renderDocManager(){
     // Label wrapping input — works natively in Safari without .click()
     var fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = '.pdf';
+    fileInput.accept = '.pdf,.xml';
     fileInput.id = 'fi-' + refCode;
     fileInput.style.cssText = 'display:none;';
     fileInput.onchange = function(e){
       var file = e.target.files[0];
-      if(file) _extractPDF(file, refCode);
+      if(file){
+        if(file.name.toLowerCase().endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml'){
+          _extractXML(file, refCode);
+        } else {
+          _extractPDF(file, refCode);
+        }
+      }
       fileInput.value = '';
     };
 
@@ -871,6 +877,43 @@ function _extractPDF(file, docCode){
   }); // end _loadPDFjs
 }
 
+
+
+function _extractXML(file, docCode){
+  _docExtractProgress[docCode] = '⏳ XML okunuyor...';
+  _renderDocManager();
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var raw = e.target.result;
+    // Strip XML tags, decode entities, clean whitespace
+    var text = raw
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, ' $1 ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').replace(/&#\d+;/g,' ')
+      .replace(/\s{3,}/g,'\n')
+      .trim();
+    var kb = Math.round(text.length/1024);
+    _docExtractProgress[docCode] = '⏳ GitHub\u2019a y\u00fckleniyor... ('+kb+'KB, XML)';
+    _renderDocManager();
+    _saveDocToGitHub(docCode, text, function(saveErr){
+      if(saveErr){
+        var cap = 3000000;
+        var txt = text.length > cap ? text.substring(0, cap) : text;
+        try{
+          localStorage.setItem('doc_text_'+docCode, txt);
+          _docExtractProgress[docCode] = '⚠️ GitHub hatası ('+saveErr.message+') — localStorage: '+Math.round(txt.length/1024)+'KB';
+        }catch(le){
+          _docExtractProgress[docCode] = '❌ Kayıt başarısız: '+saveErr.message;
+        }
+      } else {
+        _docExtractProgress[docCode] = '✅ '+kb+'KB, XML → ☁️ GitHub';
+      }
+      _renderDocManager();
+    });
+  };
+  reader.onerror = function(){ _docExtractProgress[docCode] = '❌ Dosya okunamadı'; _renderDocManager(); };
+  reader.readAsText(file, 'UTF-8');
+}
 
 // ===== BM25 SEARCH ENGINE =====
 function _tokenize(text){
