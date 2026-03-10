@@ -2229,7 +2229,10 @@ function formatResult(text) {
 
   // ── 10. NEWLINES ──────────────────────────────────────────────────────────
   text = text.replace(/\n/g, '<br>');
-  // Collapse 3+ consecutive <br> into max 2
+  // Remove standalone --- that survived (e.g. from streaming partial renders)
+  // Catches: <br>---<br>, <br> ---<br>, start of text ---<br>, etc.
+  text = text.replace(/(<br>|^)[ \t]*-{2,}[ \t]*(<br>|$)/g, '$1$2');
+  // Second pass for doubled-up <br> from above removal
   text = text.replace(/(<br>){3,}/g, '<br><br>');
   return text;
 }
