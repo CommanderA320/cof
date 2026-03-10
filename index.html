@@ -1255,7 +1255,7 @@ function _parseMSNAllocationTable(docText) {
   var tableIdx = docText.search(/AIRCRAFT\s*ALLOCATION\s*TABLE/i);
   if(tableIdx === -1) tableIdx = docText.search(/ALLOCATION\s*TABLE/i);
   if(tableIdx === -1) tableIdx = 0; // search whole doc
-  var tableSection = docText.substring(tableIdx, tableIdx + 50000);
+  var tableSection = docText.substring(tableIdx); // scan entire doc — no limit
 
   var table = {};
   var count = 0;
@@ -1327,7 +1327,9 @@ function _forceMSNParse(){
     }
   });
   if(found > 0){
-    alert('MSN tablosu güncellendi: '+found+' uçak bulundu.');
+    var tbl = JSON.parse(_ls('get','msn_allocation_table')||'{}');
+    var found_regs = Object.keys(tbl).join(', ');
+    alert('MSN tablosu güncellendi: '+found+' uçak\n\n'+found_regs);
   } else {
     alert('MSN tablosu bulunamadı.\n\nTaranan dok sayısı: '+scanned+'.\nFCOM yüklü ve önbellekte olmalı.');
   }
