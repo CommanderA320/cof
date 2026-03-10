@@ -702,6 +702,27 @@ function _renderDocManager(){
     var row = document.createElement('div');
     row.className = 'doc-row';
     row.id = 'doc-row-'+refCode.replace(/[^a-zA-Z0-9]/g,'_');
+    // Visible delete button on row
+    var delBtn = document.createElement('button');
+    delBtn.textContent = '×';
+    delBtn.title = 'Sil';
+    delBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#FF3B30;font-size:20px;font-weight:700;cursor:pointer;padding:4px 8px;line-height:1;z-index:10;';
+    delBtn.onclick = function(e){
+      e.stopPropagation();
+      if(!confirm(refCode+' dökümanını listeden kaldır?')) return;
+      var idx = REFERENCES.findIndex(function(r){ return r.code === refCode; });
+      if(idx > -1) REFERENCES.splice(idx, 1);
+      try{ localStorage.removeItem('doc_text_'+refCode); }catch(e2){}
+      try{
+        var cr = JSON.parse(localStorage.getItem('custom_refs')||'[]');
+        cr = cr.filter(function(r){ return r.code !== refCode; });
+        localStorage.setItem('custom_refs', JSON.stringify(cr));
+      }catch(e2){}
+      delete _docCache[refCode];
+      _renderDocManager();
+    };
+    row.style.position = 'relative';
+    row.appendChild(delBtn);
 
     // Swipe logic
     var startX = 0, isSwiped = false;
@@ -1575,8 +1596,12 @@ var REFERENCES = [
 (function(){
   try{
     var saved = JSON.parse(localStorage.getItem('custom_refs')||'[]');
+    // Remove any that are now in hard-coded REFERENCES (deduplication)
+    var hardCodes = REFERENCES.map(function(r){ return r.code; });
+    saved = saved.filter(function(r){ return hardCodes.indexOf(r.code) === -1; });
+    localStorage.setItem('custom_refs', JSON.stringify(saved));
     saved.forEach(function(r){
-      if(r.code && r.title && !REFERENCES.find(function(x){ return x.code===r.code; })){
+      if(r.code && r.title){
         REFERENCES.push(r);
       }
     });
