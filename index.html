@@ -3085,7 +3085,7 @@ function sendQuery() {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: 10000,
+      max_tokens: 16000,
       stream: true,
       system: [{type: "text", text: systemMsg || 'A320 Commander assistant.', cache_control: {type: "ephemeral"}}],
       messages: [{role: "user", content: finalContent}]
