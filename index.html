@@ -164,6 +164,10 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-reg-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
 .ai-reg-input{flex:1;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F9F9F9;text-transform:uppercase;outline:none;}
 .ai-reg-input:focus{border-color:#E30613;background:#fff;}
+.ai-reg-badge{font-size:10px;font-weight:700;padding:3px 7px;border-radius:10px;white-space:nowrap;letter-spacing:0.2px;}
+.ai-reg-badge.ok{background:#E8F5E9;color:#1A7A3A;border:1px solid #A5D6A7;}
+.ai-reg-badge.warn{background:#FFF8E1;color:#B45309;border:1px solid #FFD54F;}
+.ai-reg-badge.none{background:#F2F2F7;color:#8E8E93;border:1px solid #E5E5EA;}
 .ctx-tag.loaded{background:#EDFFF4;color:#1A7A3A;border-color:#34C759;}
 .ai-context-title{font-size:10px;font-weight:800;color:#636366;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
 .ai-context-title:before{content:'';display:block;width:8px;height:8px;background:#E30613;border-radius:50%;}
@@ -1300,6 +1304,26 @@ function _getMSNForReg(registration) {
     var table = JSON.parse(_ls('get','msn_allocation_table') || '{}');
     return table[registration.toUpperCase()] || null;
   } catch(e) { return null; }
+}
+
+function _updateRegBadge(){
+  var badge = document.getElementById('ai-reg-badge');
+  if(!badge) return;
+  var reg = (document.getElementById('ai-reg-input')||{}).value || _ls('get','ai_registration') || '';
+  reg = reg.trim().toUpperCase();
+  if(!reg){ badge.className='ai-reg-badge none'; badge.textContent='—'; return; }
+  var msnInfo = _getMSNForReg(reg);
+  var acInfo = _getAircraftInfo(reg);
+  if(msnInfo && msnInfo.msn){
+    badge.className='ai-reg-badge ok';
+    badge.textContent='MSN '+msnInfo.msn+' · '+msnInfo.model;
+  } else if(acInfo){
+    badge.className='ai-reg-badge warn';
+    badge.textContent=acInfo.type+' · FCOM yüklenmeli';
+  } else {
+    badge.className='ai-reg-badge warn';
+    badge.textContent='Tescil tanımsız';
+  }
 }
 
 // Parse applicability tag from FCOM/FCTM ("Applicable to:") or AFM ("Criteria:")
@@ -2449,6 +2473,7 @@ function openAI() {
         }
       });
     } catch(e){}
+    _updateRegBadge();
   })();
 
   document.getElementById("ai-input").focus();
@@ -2526,9 +2551,11 @@ function formatResult(text) {
   text = text.replace(/\bCFIT\b/g, '<strong style="color:#E30613;font-weight:900;">CFIT</strong>');
   text = text.replace(/TIME CRITICAL \(RED\)/g, '<span style="background:#E30613;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;">TIME CRITICAL (RED)</span>');
   text = text.replace(/TIME CRITICAL/g, '<span style="background:#FF3B30;color:#fff;font-weight:800;padding:2px 6px;border-radius:4px;">TIME CRITICAL</span>');
-  // SELECTED → green badge, REJECTED → red badge (single pass to avoid double-wrap)
-  text = text.replace(/\bSELECTED\b/g, '<span style="background:#1A7A3A;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">SELECTED</span>');
-  text = text.replace(/\bREJECTED\b/g, '<span style="background:#D70015;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">REJECTED</span>');
+  // SELECTED/SEÇİLDİ → green badge, REJECTED/REDDEDİLDİ → red badge
+  var _greenBadge = '<span style="background:#1A7A3A;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">$&</span>';
+  var _redBadge   = '<span style="background:#D70015;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;">$&</span>';
+  text = text.replace(/\b(SELECTED|SEÇİLDİ)\b/g, _greenBadge);
+  text = text.replace(/\b(REJECTED|REDDEDİLDİ)\b/g, _redBadge);
 
   // ── 7. MONOSPACE BLOCKS (```...```) ──────────────────────────────────────
   text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, function(match, code){
@@ -3053,7 +3080,8 @@ _loadData(function(){
       </div>
       <div class="ai-reg-row">
         <span class="ai-reg-label">✈ Reg</span>
-        <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);" />
+        <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);_updateRegBadge();" />
+        <span id="ai-reg-badge" class="ai-reg-badge none">—</span>
         <span style="font-size:11px;color:#8E8E93;">MEL auto-link</span>
       </div>
     </div>
