@@ -588,14 +588,27 @@ function _loadDocFromGitHub(docCode, cb){
     : {'Accept':'application/vnd.github.v3.raw'};
   fetch(url, {headers:headers, cache:'no-store'})
   .then(function(r){ if(r.ok) return r.text(); throw new Error('404'); })
-  .then(function(t){ _docCache[docCode]=t; cb && cb(null, t); })
+  .then(function(t){
+    _docCache[docCode]=t;
+    // Persist to localStorage so next session skips GitHub fetch
+    try{
+      var key = 'doc_text_'+docCode;
+      // Only store if under 4MB (localStorage limit safety)
+      if(t.length < 4000000) localStorage.setItem(key, t);
+    }catch(e){}
+    cb && cb(null, t);
+  })
   .catch(function(e){ cb && cb(e, ''); });
 }
 
-// Get doc text — cache first, then localStorage fallback
+// Get doc text — memory cache first, then localStorage, then empty
 function _getDocText(docCode){
   if(_docCache[docCode]) return _docCache[docCode];
-  try{ return localStorage.getItem('doc_text_'+docCode)||''; }catch(e){ return ''; }
+  try{
+    var ls = localStorage.getItem('doc_text_'+docCode)||'';
+    if(ls.length > 100) _docCache[docCode] = ls; // warm memory cache
+    return ls;
+  }catch(e){ return ''; }
 }
 
 // Check if a doc is available (cache or localStorage)
@@ -613,7 +626,17 @@ function _preloadDocs(onStatus, onDone){
     if(i >= codes.length){ _preloadDone = true; onDone && onDone(); return; }
     var code = codes[i++];
     if(_docCache[code]){ next(); return; }
-    onStatus && onStatus('⏳ Yükleniyor: '+code+' ('+i+'/'+codes.length+')');
+    // Check localStorage first — skip GitHub fetch if already cached
+    try{
+      var cached = localStorage.getItem('doc_text_'+code)||'';
+      if(cached.length > 100){
+        _docCache[code] = cached;
+        onStatus && onStatus('✅ Önbellekten: '+code+' ('+i+'/'+codes.length+')');
+        setTimeout(next, 10);
+        return;
+      }
+    }catch(e){}
+    onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
     _loadDocFromGitHub(code, function(err, text){
       if(!err && text && text.length > 100) _docCache[code] = text;
       setTimeout(next, 80);
@@ -1068,7 +1091,7 @@ function _getLoadedDocTags(){
     var text='';
     text = _getDocText(ref.code);
     var loaded = text.length > 100;
-    tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'">'+ref.code+(loaded?' ✓':'')+'</span>';
+    tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'">'+ref.title+(loaded?' ✓':'')+'</span>';
   });
   return tags;
 }
@@ -1538,9 +1561,7 @@ var REFERENCES = [
   {code:'CCM', title:'Cabin Crew Manual', rev:'', color:'#FF9500'},
   {code:'Self_Dispatch_Guide_LS_73_020', title:'Self Dispatch Guide LS.73.020', rev:'', color:'#34C759'},
   {code:'A320_GNSS_INTERFERENCE__Jamming-Spoofing__GUIDE', title:'A320 GNSS Interference Jamming-Spoofing Guide', rev:'', color:'#5856D6'},
-  {code:'EASA', title:'EASA Regulations', rev:'', color:'#007AFF'},
-  {code:'EASA_EASY', title:'EASA Easy Access Rules', rev:'', color:'#007AFF'},
-  {code:'EASA_Easy_Access_Rules', title:'EASA Easy Access Rules (Full)', rev:'', color:'#007AFF'},
+  {code:'EASA_Easy_Access_Rules', title:'EASA Easy Access Rules', rev:'', color:'#007AFF'},
   {code:'ICAO_4444', title:'ICAO Doc 4444 - PANS-ATM', rev:'', color:'#636366'},
   {code:'ICAO_8168', title:'ICAO Doc 8168 - PANS-OPS Vol I', rev:'', color:'#636366'},
   {code:'ICAO_8168-IIII', title:'ICAO Doc 8168 - PANS-OPS Vol II', rev:'', color:'#636366'},
@@ -2058,7 +2079,7 @@ function openAI() {
     var tags = '';
     REFERENCES.forEach(function(ref){
       var loaded = _docAvailable(ref.code);
-      tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'" title="'+ref.title+'">'+ref.code+(loaded?' ✓':'')+'</span>';
+      tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'" title="'+ref.code+'">'+ref.title+(loaded?' ✓':'')+'</span>';
     });
     tagsEl.innerHTML = tags;
   }
