@@ -1251,56 +1251,54 @@ function _getAircraftInfo(registration) {
 // Called after FCOM doc is loaded — extracts Aircraft Allocation Table
 function _parseMSNAllocationTable(docText) {
   if(!docText) return 0;
-  // Find allocation table section — try multiple headers
+
+  // Find allocation table section
   var tableIdx = docText.search(/AIRCRAFT\s*ALLOCATION\s*TABLE/i);
   if(tableIdx === -1) tableIdx = docText.search(/ALLOCATION\s*TABLE/i);
-  if(tableIdx === -1) tableIdx = 0; // search whole doc
-  var tableSection = docText.substring(tableIdx); // scan entire doc — no limit
+  if(tableIdx === -1) tableIdx = 0;
+  var tableSection = docText.substring(tableIdx);
 
   var table = {};
   var count = 0;
-
-  // Strategy 1: MSN + optional FSN + TC-XXX + model on same line/nearby
-  // PDF text can have varied whitespace — use flexible regex
-  // Pattern: 4-6 digit MSN, anywhere on line, then TC-XXX, then 3XX-XXX model
   var lines = tableSection.split(/\n/);
+
   for(var i = 0; i < lines.length; i++){
     var line = lines[i];
-    // Look for TC-XXX registration
+
+    // Find TC-XXX registration on this line
     var regMatch = line.match(/\b(TC-[A-Z]{3})\b/);
     if(!regMatch) continue;
     var reg = regMatch[1];
 
-    // Look for MSN: 4-6 digit number (not a year like 2024)
-    // MSN: 4-6 digit number, may start with 0. Avoid matching years (1900-2099)
-    var _msnRe = /\b(0\d{3,5}|[1-9]\d{3,5})\b/g;
-    var _msnCandidates = [];
-    var _mm;
-    var _searchLine = line + (i > 0 ? ' ' + lines[i-1] : '');
-    while((_mm = _msnRe.exec(_searchLine)) !== null){
-      var _n = parseInt(_mm[1]);
-      if(_n < 1900 || _n > 2099) _msnCandidates.push(_mm[1]); // exclude years
+    // Search ±5 lines around TC-XXX for MSN and model
+    var searchRange = '';
+    for(var j = Math.max(0,i-5); j <= Math.min(lines.length-1,i+5); j++){
+      searchRange += ' ' + lines[j];
     }
-    var msnMatch = _msnCandidates.length ? [{}, _msnCandidates[0]] : null;
-    var msn = msnMatch ? msnMatch[1] : '';
 
-    // Look for model: 3XX-XXX format (e.g. 321-231, 320-271N, 319-132)
-    var modelMatch = line.match(/\b(3(?:18|19|20|21)-\d{3}[A-Z]?)\b/);
-    // Also check next line
-    if(!modelMatch && i < lines.length-1){
-      modelMatch = lines[i+1].match(/\b(3(?:18|19|20|21)-\d{3}[A-Z]?)\b/);
+    // MSN: first 4-6 digit number that is not a year (1900-2099)
+    var msnFound = '';
+    var msnRe = /\b(\d{4,6})\b/g;
+    var mm;
+    while((mm = msnRe.exec(searchRange)) !== null){
+      var n = parseInt(mm[1]);
+      if(n < 1900 || n > 2099){ msnFound = mm[1]; break; }
     }
-    var model = modelMatch ? modelMatch[1] : '';
 
-    if(reg && (msn || model)){
-      table[reg] = { msn: msn, model: model };
+    // Model: 3XX-XXXN format
+    var modelFound = '';
+    var modelM = searchRange.match(/\b(3(?:18|19|20|21)-\d{3}[A-Z]{0,2})\b/);
+    if(modelM) modelFound = modelM[1];
+
+    if(reg && (msnFound || modelFound)){
+      table[reg] = {msn: msnFound, model: modelFound};
       count++;
     }
   }
 
   if(count > 0){
-    _ls('set', 'msn_allocation_table', JSON.stringify(table));
-    console.log('MSN allocation table parsed: ' + count + ' aircraft');
+    _ls('set','msn_allocation_table', JSON.stringify(table));
+    console.log('MSN allocation table: '+count+' aircraft parsed');
   }
   return count;
 }
@@ -1331,8 +1329,8 @@ function _updateRegBadge(){
     badge.className='ai-reg-badge ok';
     badge.textContent='MSN '+msnInfo.msn+' · '+msnInfo.model;
   } else if(acInfo){
-    badge.className='ai-reg-badge warn';
-    badge.textContent=acInfo.type+' · MSN: tabloda yok';
+    badge.className='ai-reg-badge ok';
+    badge.textContent=acInfo.type+' · tip bazlı';
   } else {
     badge.className='ai-reg-badge warn';
     badge.textContent='Tescil tanımsız';
@@ -2887,11 +2885,10 @@ function sendQuery() {
     msnData = _getMSNForReg(registration);
     setTimeout(_updateRegBadge, 100);
   }
-  // Fallback: if still no MSN, build type-only filter from Fleet DB
+  // Fallback: if still no MSN, use Fleet DB type for BM25 filter
   if(!msnData && acInfo){
-    // Extract family number from type e.g. "A321neo" → model hint "321"
-    var typeNum = acInfo.type.replace(/[^0-9]/g,'').substring(0,3);
-    msnData = {msn: null, model: typeNum ? typeNum+'-000' : null};
+    var typeNum = acInfo.type.replace(/[^0-9]/g,'').substring(0,3); // "A321neo"→"321"
+    msnData = {msn: null, model: typeNum || null};
   }
   var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
   try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
