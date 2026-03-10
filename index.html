@@ -2377,10 +2377,10 @@ function sendQuery() {
   }
 
   // BM25: pick most relevant chunks from loaded docs
-  // Multi-query BM25: search original query + extract individual failure terms
-  var docContext = _bm25MultiSearch(input);
-  // MEL registration-specific items
-  var melContext = _getMELContext(registration);
+  var docContext = '';
+  var melContext = '';
+  try { docContext = _bm25MultiSearch(input); } catch(e) { console.error('BM25 error:', e); }
+  try { melContext = _getMELContext(registration); } catch(e) { console.error('MEL error:', e); }
 
   var systemMsg = AI_SYSTEM;
   // Context goes in user message, not system (saves tokens)
@@ -2418,6 +2418,9 @@ function sendQuery() {
 
   var streamedText = '';
 
+  // Final guard — never send empty content
+  var finalContent = (userContent && userContent.trim()) ? userContent : ('A320 Turkish Airlines. Query: ' + input);
+
   fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     signal: _currentAbort ? _currentAbort.signal : undefined,
@@ -2432,8 +2435,8 @@ function sendQuery() {
       model: "claude-sonnet-4-6",
       max_tokens: 10000,
       stream: true,
-      system: [{type: "text", text: systemMsg, cache_control: {type: "ephemeral"}}],
-      messages: [{role: "user", content: userContent}]
+      system: [{type: "text", text: systemMsg || 'A320 Commander assistant.', cache_control: {type: "ephemeral"}}],
+      messages: [{role: "user", content: finalContent}]
     })
   })
   .then(function(r) {
