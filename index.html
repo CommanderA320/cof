@@ -1308,34 +1308,6 @@ function _getMSNForReg(registration) {
   } catch(e) { return null; }
 }
 
-function _forceMSNParse(){
-  _ls('set','msn_allocation_table','{}'); // clear cache
-  var found = 0, scanned = 0;
-  REFERENCES.forEach(function(ref){
-    var txt = _getDocText(ref.code);
-    if(!txt || txt.length < 100) return;
-    scanned++;
-    // Try multiple variants of the table header
-    var hasTable = /AIRCRAFT\s*ALLOCATION\s*TABLE/i.test(txt) ||
-                   /ALLOCATION\s*TABLE/i.test(txt) ||
-                   /MSN.*TC-J/i.test(txt) ||
-                   /TC-J[A-Z]{2}.*\d{3}-\d{3}/i.test(txt);
-    if(hasTable){
-      var n = _parseMSNAllocationTable(txt);
-      found += (n||0);
-      console.log('MSN parse from '+ref.code+': '+n+' entries');
-    }
-  });
-  if(found > 0){
-    var tbl = JSON.parse(_ls('get','msn_allocation_table')||'{}');
-    var found_regs = Object.keys(tbl).join(', ');
-    alert('MSN tablosu güncellendi: '+found+' uçak\n\n'+found_regs);
-  } else {
-    alert('MSN tablosu bulunamadı.\n\nTaranan dok sayısı: '+scanned+'.\nFCOM yüklü ve önbellekte olmalı.');
-  }
-  _updateRegBadge();
-}
-
 function _updateRegBadge(){
   var badge = document.getElementById('ai-reg-badge');
   if(!badge) return;
@@ -2892,6 +2864,14 @@ function sendQuery() {
   var docContext = '';
   var melContext = '';
   // Inject MSN into query so FCOM/AFM/FCTM chunks with that MSN get boosted
+  // If MSN table not yet parsed, try now silently
+  if(!_ls('get','msn_allocation_table') || _ls('get','msn_allocation_table') === '{}'){
+    REFERENCES.forEach(function(ref){
+      var txt = _getDocText(ref.code);
+      if(txt && txt.length > 100) _parseMSNAllocationTable(txt);
+    });
+    setTimeout(_updateRegBadge, 100);
+  }
   var msnData = _getMSNForReg(registration);
   var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
   try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
@@ -3120,7 +3100,7 @@ _loadData(function(){
         <span class="ai-reg-label">✈ Reg</span>
         <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);_updateRegBadge();" />
         <span id="ai-reg-badge" class="ai-reg-badge none">—</span>
-        <span onclick="_forceMSNParse()" style="font-size:14px;cursor:pointer;padding:2px 4px;" title="MSN tablosunu yeniden tara">🔄</span>
+
         <span style="font-size:11px;color:#8E8E93;">MEL auto-link</span>
       </div>
     </div>
