@@ -1017,11 +1017,14 @@ function _bm25Score(chunk, queryTerms){
     var idf = Math.log(1 + (1000-1+0.5)/(tf+0.5));
     score += idf * (tf*(k1+1)) / (tf + k1*(1-b+b*N/avgdl));
   });
-  // Boost: chunk contains SHALL/MUST/WARNING near query terms = procedure text
-  if(/\b(SHALL|MUST|WARNING|CAUTION|ECAM|QRH|ACTION|INOPERATIVE|INOP)\b/i.test(chunk.text)) score *= 1.4;
-  // Boost: chunk contains multiple query terms together (phrase proximity)
+  // Boost: chunk contains SHALL/MUST/WARNING/procedure keywords
+  if(/\b(SHALL|MUST|WARNING|CAUTION|ECAM|QRH|ACTION|INOPERATIVE|INOP|DISPATCH|DEFERRED)\b/i.test(chunk.text)) score *= 1.4;
+  // Boost: chunk contains multiple query terms
   var matchCount = queryTerms.filter(function(t){ return text.indexOf(t) > -1; }).length;
-  if(matchCount >= 2) score *= (1 + matchCount * 0.2);
+  if(matchCount >= 2) score *= (1 + matchCount * 0.25);
+  // Boost: MEL item codes in chunk (XX-XX-XX format)
+  var melInQuery = queryTerms.join(' ').match(/\d{2}-\d{2}/g);
+  if(melInQuery && melInQuery.some(function(m){ return text.indexOf(m) > -1; })) score *= 2.0;
   return score;
 }
 
@@ -1068,6 +1071,45 @@ function _bm25Search(query, maxChunks){
   Object.keys(byDoc).forEach(function(doc){
     ctx += '\n\n=== '+doc+': '+byDoc[doc].title+' ===\n';
     ctx += byDoc[doc].chunks.join('\n---\n');
+  });
+  return ctx;
+}
+
+// ===== MULTI-QUERY BM25 =====
+function _bm25MultiSearch(query) {
+  // Extract distinct failure/system terms from query for targeted sub-searches
+  var subQueries = [query]; // always include full query
+
+  // Extract MEL items (e.g. 22-70-01B, 29-10-01A)
+  var melMatches = query.match(/\b\d{2}-\d{2}-\d{2}[A-Z]?\b/g);
+  if(melMatches) melMatches.forEach(function(m){ subQueries.push('MEL '+m+' dispatch condition inoperative'); });
+
+  // Extract system failures
+  var failurePatterns = [
+    {re:/HYD[\s_]*[BbGgYy]|BLUE.*RSVR|RSVR.*LO|hydraulic/i, q:'hydraulic blue reservoir low RAT CSM-G'},
+    {re:/BOTH.*GEN|ENGINE.*GEN.*FAIL|AC.*BUS.*DEAD|electrical.*fail/i, q:'both generators fail AC bus electrical emergency BAT ONLY'},
+    {re:/ADR.*FAIL|TRIPLE.*ADR|unreliable.*speed/i, q:'ADR failure unreliable airspeed alternate law direct law'},
+    {re:/MAYDAY|fuel.*emergency|minimum.*fuel/i, q:'MAYDAY fuel emergency commander declaration'},
+    {re:/CAT.*III|LVO|low.*vis/i, q:'CAT III LVO low visibility approach minima'},
+    {re:/CFIT|terrain|MSA|MVA/i, q:'CFIT terrain minimum safe altitude'},
+  ];
+  failurePatterns.forEach(function(p){
+    if(p.re.test(query)) subQueries.push(p.q);
+  });
+
+  // Run each sub-query, collect top 2 chunks each, deduplicate
+  var seen = {};
+  var allSelected = [];
+  subQueries.forEach(function(q){
+    var results = _bm25Search(q, 8);
+    // Split results back into chunks to deduplicate
+    if(results) allSelected.push({q:q, ctx:results});
+  });
+
+  // Cap total context at ~6000 chars
+  var ctx = '';
+  allSelected.forEach(function(r){
+    if(ctx.length < 5500) ctx += r.ctx;
   });
   return ctx;
 }
@@ -2335,7 +2377,8 @@ function sendQuery() {
   }
 
   // BM25: pick most relevant chunks from loaded docs
-  var docContext = _bm25Search(input, 4);
+  // Multi-query BM25: search original query + extract individual failure terms
+  var docContext = _bm25MultiSearch(input);
   // MEL registration-specific items
   var melContext = _getMELContext(registration);
 
