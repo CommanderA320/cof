@@ -1202,7 +1202,7 @@ var THY_FLEET = {
   'TC-LSO':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   'TC-LSP':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   'TC-LSR':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
-  'TC-LSS':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
+  'TC-LSS':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'msn':'09157','model':'321-253N','notes':'Sharklets, center tank'},
   'TC-LST':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   'TC-LSU':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   // A321ceo
@@ -1272,11 +1272,16 @@ function _parseMSNAllocationTable(docText) {
     var reg = regMatch[1];
 
     // Look for MSN: 4-6 digit number (not a year like 2024)
-    var msnMatch = line.match(/\b(0\d{4}|[1-9]\d{3,5})\b/);
-    // If not on same line, check previous line
-    if(!msnMatch && i > 0){
-      msnMatch = lines[i-1].match(/\b(0\d{4}|[1-9]\d{3,5})\b/);
+    // MSN: 4-6 digit number, may start with 0. Avoid matching years (1900-2099)
+    var _msnRe = /\b(0\d{3,5}|[1-9]\d{3,5})\b/g;
+    var _msnCandidates = [];
+    var _mm;
+    var _searchLine = line + (i > 0 ? ' ' + lines[i-1] : '');
+    while((_mm = _msnRe.exec(_searchLine)) !== null){
+      var _n = parseInt(_mm[1]);
+      if(_n < 1900 || _n > 2099) _msnCandidates.push(_mm[1]); // exclude years
     }
+    var msnMatch = _msnCandidates.length ? [{}, _msnCandidates[0]] : null;
     var msn = msnMatch ? msnMatch[1] : '';
 
     // Look for model: 3XX-XXX format (e.g. 321-231, 320-271N, 319-132)
@@ -1302,10 +1307,16 @@ function _parseMSNAllocationTable(docText) {
 
 function _getMSNForReg(registration) {
   if(!registration) return null;
+  // First check FCOM parsed table
   try {
     var table = JSON.parse(_ls('get','msn_allocation_table') || '{}');
-    return table[registration.toUpperCase()] || null;
-  } catch(e) { return null; }
+    var fcomEntry = table[registration.toUpperCase()];
+    if(fcomEntry && fcomEntry.msn) return fcomEntry;
+  } catch(e) {}
+  // Fallback: check Fleet DB for hardcoded msn/model
+  var ac = THY_FLEET[registration.toUpperCase().trim()];
+  if(ac && ac.msn) return {msn: ac.msn, model: ac.model || ac.type};
+  return null;
 }
 
 function _updateRegBadge(){
@@ -1321,7 +1332,7 @@ function _updateRegBadge(){
     badge.textContent='MSN '+msnInfo.msn+' · '+msnInfo.model;
   } else if(acInfo){
     badge.className='ai-reg-badge warn';
-    badge.textContent=acInfo.type+' · FCOM yüklenmeli';
+    badge.textContent=acInfo.type+' · MSN: tabloda yok';
   } else {
     badge.className='ai-reg-badge warn';
     badge.textContent='Tescil tanımsız';
@@ -2867,13 +2878,20 @@ function sendQuery() {
   // Try to get MSN — if not found, re-scan all docs (stale/partial cache)
   var msnData = _getMSNForReg(registration);
   if(!msnData && registration){
-    _ls('set','msn_allocation_table','{}'); // clear stale cache
+    // Re-scan docs once in case cache is stale
+    _ls('set','msn_allocation_table','{}');
     REFERENCES.forEach(function(ref){
       var txt = _getDocText(ref.code);
       if(txt && txt.length > 100) _parseMSNAllocationTable(txt);
     });
     msnData = _getMSNForReg(registration);
     setTimeout(_updateRegBadge, 100);
+  }
+  // Fallback: if still no MSN, build type-only filter from Fleet DB
+  if(!msnData && acInfo){
+    // Extract family number from type e.g. "A321neo" → model hint "321"
+    var typeNum = acInfo.type.replace(/[^0-9]/g,'').substring(0,3);
+    msnData = {msn: null, model: typeNum ? typeNum+'-000' : null};
   }
   var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
   try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
