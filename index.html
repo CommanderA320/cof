@@ -1202,7 +1202,7 @@ var THY_FLEET = {
   'TC-LSO':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   'TC-LSP':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   'TC-LSR':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
-  'TC-LSS':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
+  'TC-LSS':{'type':'A321neo','engine':'CFM LEAP-1A32','mtow':97000,'mlw':79200,'mzfw':75800,'fuel_cap':32940,'seats':199,'notes':'Sharklets, center tank'},
   'TC-LST':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   'TC-LSU':{'type':'A320neo','engine':'CFM LEAP-1A26','mtow':79000,'mlw':67400,'mzfw':64300,'fuel_cap':26730,'seats':168,'notes':'Sharklets'},
   // A321ceo
@@ -1251,8 +1251,9 @@ function _getAircraftInfo(registration) {
 // Called after FCOM doc is loaded — extracts Aircraft Allocation Table
 function _parseMSNAllocationTable(docText) {
   if(!docText) return 0;
-  // Find allocation table section — search whole doc if not found in first pass
-  var tableIdx = docText.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i);
+  // Find allocation table section — try multiple headers
+  var tableIdx = docText.search(/AIRCRAFT\s*ALLOCATION\s*TABLE/i);
+  if(tableIdx === -1) tableIdx = docText.search(/ALLOCATION\s*TABLE/i);
   if(tableIdx === -1) tableIdx = 0; // search whole doc
   var tableSection = docText.substring(tableIdx, tableIdx + 50000);
 
@@ -1305,6 +1306,32 @@ function _getMSNForReg(registration) {
     var table = JSON.parse(_ls('get','msn_allocation_table') || '{}');
     return table[registration.toUpperCase()] || null;
   } catch(e) { return null; }
+}
+
+function _forceMSNParse(){
+  _ls('set','msn_allocation_table','{}'); // clear cache
+  var found = 0, scanned = 0;
+  REFERENCES.forEach(function(ref){
+    var txt = _getDocText(ref.code);
+    if(!txt || txt.length < 100) return;
+    scanned++;
+    // Try multiple variants of the table header
+    var hasTable = /AIRCRAFT\s*ALLOCATION\s*TABLE/i.test(txt) ||
+                   /ALLOCATION\s*TABLE/i.test(txt) ||
+                   /MSN.*TC-J/i.test(txt) ||
+                   /TC-J[A-Z]{2}.*\d{3}-\d{3}/i.test(txt);
+    if(hasTable){
+      var n = _parseMSNAllocationTable(txt);
+      found += (n||0);
+      console.log('MSN parse from '+ref.code+': '+n+' entries');
+    }
+  });
+  if(found > 0){
+    alert('MSN tablosu güncellendi: '+found+' uçak bulundu.');
+  } else {
+    alert('MSN tablosu bulunamadı.\n\nTaranan dok sayısı: '+scanned+'.\nFCOM yüklü ve önbellekte olmalı.');
+  }
+  _updateRegBadge();
 }
 
 function _updateRegBadge(){
@@ -3091,6 +3118,7 @@ _loadData(function(){
         <span class="ai-reg-label">✈ Reg</span>
         <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);_updateRegBadge();" />
         <span id="ai-reg-badge" class="ai-reg-badge none">—</span>
+        <span onclick="_forceMSNParse()" style="font-size:14px;cursor:pointer;padding:2px 4px;" title="MSN tablosunu yeniden tara">🔄</span>
         <span style="font-size:11px;color:#8E8E93;">MEL auto-link</span>
       </div>
     </div>
