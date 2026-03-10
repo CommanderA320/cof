@@ -996,7 +996,7 @@ function _chunkDoc(docCode, docTitle, text){
     var wc = p.split(/\s+/).length;
     buf += (buf ? '\n' : '') + p;
     bufWords += wc;
-    if(bufWords >= 200 || i === paras.length-1){
+    if(bufWords >= 400 || i === paras.length-1){
       chunks.push({doc:docCode, title:docTitle, text:buf});
       buf=''; bufWords=0;
     }
@@ -1057,7 +1057,7 @@ function _bm25Search(query, maxChunks){
 
   // Take top N, build context string
   var selected = allChunks.filter(function(c){return c.score>0;}).slice(0, maxChunks);
-  selected = selected.map(function(c){ return {doc:c.doc,title:c.title,text:c.text.substring(0,600)}; });
+  selected = selected.map(function(c){ return {doc:c.doc,title:c.title,text:c.text.substring(0,1200)}; });
   if(!selected.length) return '';
 
   // Group by doc for clean output
@@ -1101,7 +1101,7 @@ function _bm25MultiSearch(query) {
   var seen = {};
   var allSelected = [];
   subQueries.forEach(function(q){
-    var results = _bm25Search(q, 8);
+    var results = _bm25Search(q, 16);
     // Split results back into chunks to deduplicate
     if(results) allSelected.push({q:q, ctx:results});
   });
@@ -1109,7 +1109,7 @@ function _bm25MultiSearch(query) {
   // Cap total context at ~6000 chars
   var ctx = '';
   allSelected.forEach(function(r){
-    if(ctx.length < 5500) ctx += r.ctx;
+    if(ctx.length < 12000) ctx += r.ctx;
   });
   return ctx;
 }
