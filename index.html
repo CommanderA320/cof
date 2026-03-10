@@ -2174,15 +2174,17 @@ function formatResult(text) {
   if(firstRealIdx > 0) text = text.slice(firstRealIdx);
 
   // Convert section headers: --- TITLE ---
-  text = text.replace(/---[ \t]*([^\n\r\-]{2,}?)[ \t]*---/g, function(match, title){
+  // Match --- TITLE --- where title may contain single dashes (FOR-DEC, 22-70-01B etc)
+  // Uses negative lookahead to stop before ---
+  text = text.replace(/---[ \t]*((?:(?!---)[^\n\r]){2,}?)[ \t]*---/g, function(match, title){
     title = title.trim();
     if(!title) return '';
     return '<SECTIONHDR>'+title+'</SECTIONHDR>';
   });
-  // Remove all remaining standalone dash lines (--- or --)
-  text = text.replace(/^[ \t]*-{2,}[ \t]*$/gm, '');
+  // Remove all remaining standalone dash lines
+  text = text.replace(/^[ \t]*-{3,}[ \t]*$/gm, '');
   // Collapse blank lines before converting to <br>
-  text = text.replace(/\n{3,}/g, '\n\n');
+  text = text.replace(/\n{2,}/g, '\n');
   // Now convert newlines
   text = text.replace(/\n/g, '<br>');
   // Remove <br>---<br> patterns (streaming artifacts)
@@ -2191,10 +2193,10 @@ function formatResult(text) {
   text = text.replace(/<SECTIONHDR>(.*?)<\/SECTIONHDR>/g, function(m, title){
     return '<div class="ai-section-hdr"><span class="ai-section-dot"></span>'+title+'</div>';
   });
-  // Remove <br> immediately BEFORE a section header (header has its own top margin)
+  // Remove ALL <br> before a section header
   text = text.replace(/(<br>)+(<div class="ai-section-hdr">)/g, '$2');
-  // Remove <br> immediately AFTER a section header (keep tight)
-  text = text.replace(/(<\/div>)(<br>)+/g, '$1<br>');
+  // Remove ALL <br> after a section header
+  text = text.replace(/(<div class="ai-section-hdr">.*?<\/div>)(<br>)+/g, '$1');
 
 
   // ── 3. FOR-DEC LETTER BADGES ─────────────────────────────────────────────
@@ -2247,8 +2249,8 @@ function formatResult(text) {
   });
 
   // ── 9. FINAL CLEANUP ──────────────────────────────────────────────────────
-  // Collapse excess <br> (max 2 consecutive = one blank line)
-  text = text.replace(/(<br>){3,}/g, '<br><br>');
+  // No blank lines — collapse ALL multiple <br> to single <br>
+  text = text.replace(/(<br>){2,}/g, '<br>');
   return text;
 }
 
