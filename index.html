@@ -1123,41 +1123,50 @@ function _bm25MultiSearch(query, aircraftMSN) {
   // Extract ECAM alert title from query (words in CAPS or after 'ecam')
   var oebContext = '';
   try {
-    var ecamMatch = query.match(/(?:ecam\s+)?([A-Z][A-Z\s\/\(\)0-9\+]+(?:FAULT|FAIL|INOP|WARNING|CAUTION|LOW|LOSS|OFF|LEAK))/i);
-    var alertTitle = ecamMatch ? ecamMatch[1].trim() : query.substring(0, 60);
-    // Search QRH specifically for OEB section + alert title
-    var oebQueries = [
-      'LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN Identification Title ' + alertTitle,
-      'LIST EFFECTIVE OEB Identification ' + alertTitle.split(' ').slice(0,4).join(' '),
-      'OPERATIONS ENGINEERING BULLETINS ' + alertTitle,
-    ];
-    var oebChunks = '';
-    var oebSeen = {};
-    oebQueries.forEach(function(oq) {
-      // Only search QRH document
-      var qrhText = _getDocText('QRH');
-      if(!qrhText) return;
-      var chunks = _chunkDoc('QRH', 'Quick Reference Handbook', qrhText);
-      var terms = _tokenize(oq);
-      var scored = chunks.map(function(ch) {
-        var s = _bm25Score(ch, terms, aircraftMSN ? aircraftMSN.msn : null);
-        // Strong boost for OEB list/index pages
-        if(/LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN/i.test(ch.text)) s *= 15;
-        if(/No Operations Engineering Bulletin impacting QRH/i.test(ch.text)) s *= 10;
-        if(/OPERATIONS ENGINEERING BULLETIN/i.test(ch.text)) s *= 5;
-        if(/Identification.*Title|OEB\s*\d+/i.test(ch.text)) s *= 4;
-        if(ch.text.toLowerCase().indexOf(alertTitle.split(' ')[0].toLowerCase()) > -1) s *= 3;
-        return {chunk:ch, score:s};
-      }).filter(function(x){return x.score>0;}).sort(function(a,b){return b.score-a.score;});
-      scored.slice(0,3).forEach(function(x) {
-        var key = x.chunk.text.substring(0,80);
-        if(!oebSeen[key] && oebChunks.length < 4000) {
-          oebSeen[key] = 1;
-          oebChunks += '\n[QRH — OEB SECTION]\n' + x.chunk.text + '\n';
+    var qrhText = _getDocText('QRH');
+    if(qrhText) {
+      // Step 1: Extract LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN page from QRH
+      var listPageText = '';
+      var listIdx = qrhText.search(/LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN/i);
+      if(listIdx > -1) {
+        // Take up to 4000 chars from that point — covers the full table
+        listPageText = qrhText.substring(listIdx, Math.min(qrhText.length, listIdx + 4000));
+      }
+
+      // Step 2: Extract exact ECAM alert title from user query
+      // ECAM title is everything after "ecam" keyword, or the whole query if no keyword
+      var ecamTitleMatch = query.match(/(?:ecam[\s]+)([\w\s\(\)\/\+\-]+?)(?:[\s]*$|[\s]*,)/i);
+      var ecamTitle = ecamTitleMatch ? ecamTitleMatch[1].trim() : query.trim();
+
+      // Step 3: Build OEB context block
+      var oebFound = false;
+      var noOebFound = false;
+
+      if(listPageText) {
+        // Check if exact ECAM title appears in the list page
+        if(listPageText.toLowerCase().indexOf(ecamTitle.toLowerCase()) > -1) {
+          oebFound = true;
         }
-      });
-    });
-    if(oebChunks) oebContext = '\n=== QRH OPERATIONS ENGINEERING BULLETINS (MANDATORY READ) ===\n' + oebChunks + '\n';
+        if(/No Operations Engineering Bulletin impacting QRH/i.test(listPageText)) {
+          noOebFound = true;
+        }
+
+        oebContext = '\n=== QRH LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN PAGE ===\n'
+          + 'ECAM TITLE SEARCHED: ' + ecamTitle + '\n'
+          + (oebFound ? 'TITLE FOUND IN LIST: YES — OEB EXISTS. Execute OEB procedure BEFORE ECAM.\n'
+             : noOebFound ? 'TITLE FOUND IN LIST: NO — page states No Operations Engineering Bulletin impacting QRH. Proceed directly to ECAM.\n'
+             : 'TITLE FOUND IN LIST: NOT CONFIRMED — read the table below carefully.\n')
+          + '--- TABLE CONTENT ---\n'
+          + listPageText + '\n=== END OEB LIST ===\n';
+
+      } else {
+        // LIST OF EFFECTIVE page not found in loaded QRH text
+        oebContext = '\n=== QRH LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN PAGE ===\n'
+          + 'WARNING: LIST OF EFFECTIVE page not found in loaded QRH text. '
+          + 'Physical QRH check MANDATORY before ECAM execution.\n'
+          + '=== END OEB LIST ===\n';
+      }
+    }
   } catch(e) {}
 
   // Extract distinct failure/system terms from query for targeted sub-searches
