@@ -166,8 +166,9 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-context-chevron.open{transform:rotate(180deg);}
 .ai-context-body{overflow:hidden;max-height:0;transition:max-height 0.25s ease;}
 .ai-context-body.open{max-height:300px;}
-@keyframes pulse-red{0%,100%{opacity:1;}50%{opacity:0.2;}}
-.ctx-loading{animation:pulse-red 0.9s infinite;color:#E30613 !important;font-weight:800;}
+@keyframes pulse-red{0%,100%{opacity:1;}50%{opacity:0.15;}}
+.ctx-loading{animation:pulse-red 0.8s infinite;color:#E30613 !important;font-weight:800;}
+.ctx-title-loading{animation:pulse-red 0.8s infinite;}
 .ai-reg-row{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #E5E5EA;}
 .ai-reg-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
 .ai-reg-input{width:80px;flex:none;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F2F2F7;outline:none;text-transform:uppercase;}
@@ -2570,12 +2571,12 @@ function openAI() {
     if(!tagsEl) return;
     if(statusMsg){
       tagsEl.innerHTML = '<span class="ctx-tag ctx-loading" style="color:#E30613;">⏳ '+statusMsg+'</span>';
-      if(titleEl){ titleEl.textContent = 'Documents loading...'; titleEl.style.color='#E30613'; }
+      if(titleEl){ titleEl.textContent = 'Documents loading...'; titleEl.style.color='#E30613'; titleEl.classList.add('ctx-title-loading'); }
       return;
     }
     var total = REFERENCES.length;
     var loaded = REFERENCES.filter(function(r){ return _docAvailable(r.code); }).length;
-    if(titleEl){ titleEl.textContent = loaded < total ? 'Sources: '+loaded+'/'+total+' loading...' : 'Sources ready ✓ ('+total+' docs)'; titleEl.style.color = loaded < total ? '#E30613' : '#1A7A3A'; }
+    if(titleEl){ var isLoading = loaded < total; titleEl.textContent = isLoading ? 'Sources: '+loaded+'/'+total+' loading...' : 'Sources ready ✓ ('+total+' docs)'; titleEl.style.color = isLoading ? '#E30613' : '#1A7A3A'; if(isLoading){ titleEl.classList.add('ctx-title-loading'); } else { titleEl.classList.remove('ctx-title-loading'); } }
     var tags = '';
     REFERENCES.forEach(function(ref){
       var ok = _docAvailable(ref.code);
