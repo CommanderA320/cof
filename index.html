@@ -3004,7 +3004,7 @@ function sendQuery() {
   try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
   try { melContext = _getMELContext(registration); } catch(e) { console.error('MEL error:', e); }
 
-  var systemMsg = AI_SYSTEM;
+  var systemMsg = (_aiMode === "procedure") ? AI_PROC_SYSTEM : AI_SYSTEM;
   // Context goes in user message, not system (saves tokens)
   var contextBlock = '';
   if(melContext || docContext){
@@ -3280,8 +3280,12 @@ _loadData(function(){
 
   <div id="ai-history" style="display:none;padding:8px 16px 0;background:#fff;border-top:1px solid #E5E5EA;"></div>
   <div class="ai-input-bar">
+    <div id="ai-mode-selector" style="display:flex;gap:6px;margin-bottom:8px;">
+      <button id="mode-btn-scenario" onclick="setAIMode('scenario')" style="flex:1;padding:7px 0;border-radius:10px;border:none;font-size:11px;font-weight:800;letter-spacing:0.4px;cursor:pointer;background:#E30613;color:#fff;">🔴 SCENARIO</button>
+      <button id="mode-btn-procedure" onclick="setAIMode('procedure')" style="flex:1;padding:7px 0;border-radius:10px;border:1.5px solid #E5E5EA;font-size:11px;font-weight:800;letter-spacing:0.4px;cursor:pointer;background:#F2F2F7;color:#8E8E93;">📖 PROCEDURE</button>
+    </div>
     <div class="ai-input-row">
-      <textarea class="ai-textarea" id="ai-input" placeholder="Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations..." rows="2"></textarea>
+      <textarea class="ai-textarea" id="ai-input" id="ai-input-ta" placeholder="Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations..." rows="2"></textarea>
       <button class="ai-stop-btn" id="ai-stop-btn" onclick="stopQuery()" style="display:none;background:#FF3B30;border:none;border-radius:14px;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:20px;font-weight:700;">◼</button>
       <button class="ai-send-btn" id="ai-send-btn" onclick="sendQuery()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -3380,6 +3384,27 @@ function openReferences(){
 function closeReferences(){
   document.getElementById('ref-modal').style.display='none';
 }
+
+// ===== AI MODE =====
+var _aiMode = 'scenario';
+var AI_PROC_SYSTEM = "Sen bir Turkish Airlines A320 operasyon uzmanısın. Görevin: kullanıcının sorduğu PROSEDÜRÜ ya da KURALI, ilgili dokümanlardan (Part A, Part B, GOM, FCTM vb.) adım adım, eksiksiz vermek. FORMAT KURALLARI: 1) Giriş cümlesi: 'X prosedürü (Kaynak: Y, Bölüm Z)' 2) Her adım numaralı liste 3) Kritik notlar için ⚠️ 4) İlgili limitler için tablo 5) KESINLIKLE senaryo değerlendirmesi, FOR-DEC, risk assessment YAPMA — sadece prosedürü ver. Eğer birden fazla dokümanda geçiyorsa hepsini göster. Türkçe yanıt ver.";
+
+function setAIMode(mode) {
+  _aiMode = mode;
+  var sb = document.getElementById('mode-btn-scenario');
+  var pb = document.getElementById('mode-btn-procedure');
+  var ta = document.getElementById('ai-input-ta') || document.getElementById('ai-input');
+  if(mode === 'scenario') {
+    sb.style.background = '#E30613'; sb.style.color = '#fff'; sb.style.border = 'none';
+    pb.style.background = '#F2F2F7'; pb.style.color = '#8E8E93'; pb.style.border = '1.5px solid #E5E5EA';
+    if(ta) ta.placeholder = 'Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations...';
+  } else {
+    pb.style.background = '#007AFF'; pb.style.color = '#fff'; pb.style.border = 'none';
+    sb.style.background = '#F2F2F7'; sb.style.color = '#8E8E93'; sb.style.border = '1.5px solid #E5E5EA';
+    if(ta) ta.placeholder = 'Prosedür sor: "Yakıtlı yolcu binişi prosedürü nedir?" / "Contaminated runway limitleri?" / "Low visibility takeoff prosedürü?"';
+  }
+}
+
 </script>
 </body>
 </html>
