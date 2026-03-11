@@ -2795,10 +2795,14 @@ function _renderHistory(){
   if(!el) return;
   if(!_queryHistory.length){ el.style.display='none'; return; }
   el.style.display='block';
+  var maxShow = 3;
+  var shown = _queryHistory.slice(0, maxShow);
+  var extra = _queryHistory.length - maxShow;
   el.innerHTML = '<div class="ai-examples-title">LAST QUERIES</div>'
-    + _queryHistory.map(function(q,i){
+    + shown.map(function(q,i){
         return '<div class="example-chip" onclick="useHistory('+i+')"><div class="example-chip-txt" style="font-size:13px;">'+q.substring(0,90)+(q.length>90?'…':'')+'</div></div>';
-      }).join('');
+      }).join('')
+    + (extra > 0 ? '<div style="font-size:11px;color:#8E8E93;padding:4px 4px 0;">+ '+extra+' more</div>' : '');
 }
 
 function useHistory(idx){
