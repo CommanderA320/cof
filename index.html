@@ -736,10 +736,16 @@ function _renderDocManager(){
     row.className = 'doc-row';
     row.id = 'doc-row-'+refCode.replace(/[^a-zA-Z0-9]/g,'_');
     // Visible delete button on row
+    // Check if this is a custom (user-added) doc or built-in
+    var _customCodes = [];
+    try{ _customCodes = (JSON.parse(localStorage.getItem('custom_refs')||'[]')).map(function(r){return r.code;}); }catch(e){}
+    var _isCustomDoc = _customCodes.indexOf(refCode) > -1;
+
     var delBtn = document.createElement('button');
     delBtn.textContent = '×';
     delBtn.title = 'Sil';
-    delBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#FF3B30;font-size:20px;font-weight:700;cursor:pointer;padding:4px 8px;line-height:1;z-index:10;';
+    // Only show × for custom docs — built-in docs cannot be deleted
+    delBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#FF3B30;font-size:20px;font-weight:700;cursor:pointer;padding:4px 8px;line-height:1;z-index:10;display:' + (_isCustomDoc ? 'block' : 'none') + ';';
     delBtn.onclick = function(e){
       e.stopPropagation();
       if(!confirm(refCode+' dökümanını listeden kaldır?')) return;
@@ -755,11 +761,6 @@ function _renderDocManager(){
       _renderDocManager();
     };
     row.style.position = 'relative';
-    // For built-in docs: hide delete button (cannot be deleted)
-    var isBuiltInDoc = REFERENCES.slice(0, 25).some(function(r){ return r.code === refCode; });
-    if(isBuiltInDoc) {
-      delBtn.style.display = 'none';
-    }
     row.appendChild(delBtn);
 
     // Swipe logic
@@ -808,7 +809,7 @@ function _renderDocManager(){
 
     // For built-in refs: show refresh icon, clicking fetches from GitHub
     // For custom refs: show upload icon, clicking opens file picker
-    var isBuiltIn = REFERENCES.slice(0, 25).some(function(r){ return r.code === refCode; });
+    var isBuiltIn = !_isCustomDoc;
     if(isBuiltIn) {
       uploadBtn.textContent = hasDoc ? '🔄' : '⬇️';
       uploadBtn.title = hasDoc ? 'Yenile' : 'Yukle';
