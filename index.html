@@ -2626,6 +2626,11 @@ function openAI() {
 
 function closeAI() {
   document.getElementById("ai-screen").className = "";
+  _restoreAIExamples();
+}
+function _restoreAIExamples() {
+  var exEl=document.getElementById("ai-examples"); if(exEl) exEl.style.display="";
+  _renderHistory();
 }
 
 function setExample(idx) {
@@ -2978,6 +2983,9 @@ function sendQuery() {
   // Show loading
   document.getElementById("ai-loading").className = "ai-loading on";
   document.getElementById("ai-result").className = "ai-result";
+  // Hide examples and history to give result more space
+  var exEl=document.getElementById("ai-examples"); if(exEl) exEl.style.display="none";
+  var hisEl=document.getElementById("ai-history"); if(hisEl) hisEl.style.display="none";
   document.getElementById("ai-send-btn").style.display = "none";
   document.getElementById("ai-stop-btn").style.display = "flex";
   document.getElementById("ai-send-btn").disabled = true;
@@ -3262,7 +3270,7 @@ _loadData(function(){
     </div>
 
     <!-- Example queries -->
-    <div class="ai-examples">
+    <div class="ai-examples" id="ai-examples">
       <div class="ai-examples-title">Example Scenarios</div>
       <div class="example-chip" onclick="setExample(0)">
         <div class="example-chip-cat">MEL + WEATHER + RUNWAY</div>
@@ -3311,7 +3319,7 @@ _loadData(function(){
       <button id="mode-btn-procedure" onclick="setAIMode('procedure')" style="flex:1;padding:7px 0;border-radius:10px;border:1.5px solid #E5E5EA;font-size:11px;font-weight:800;letter-spacing:0.4px;cursor:pointer;background:#F2F2F7;color:#8E8E93;">📖 PROCEDURE</button>
     </div>
     <div class="ai-input-row">
-      <textarea class="ai-textarea" id="ai-input" id="ai-input-ta" placeholder="Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations..." rows="2"></textarea>
+      <textarea class="ai-textarea" id="ai-input" oninput="if(!this.value.trim()){_restoreAIExamples();}" id="ai-input-ta" placeholder="Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations..." rows="2"></textarea>
       <button class="ai-stop-btn" id="ai-stop-btn" onclick="stopQuery()" style="display:none;background:#FF3B30;border:none;border-radius:14px;width:48px;height:48px;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:20px;font-weight:700;">◼</button>
       <button class="ai-send-btn" id="ai-send-btn" onclick="sendQuery()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
