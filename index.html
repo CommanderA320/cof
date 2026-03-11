@@ -2822,7 +2822,7 @@ function _renderHistory(){
   el.innerHTML = '<div class="ai-examples-title">LAST QUERIES</div>'
     + shown.map(function(q,i){
         return '<div class="example-chip" onclick="useHistory('+i+')"><div class="example-chip-txt" style="font-size:13px;">'+q.substring(0,90)+(q.length>90?'…':'')+'</div></div>';
-      }).join('');  + (extra > 0 ? '<div style="font-size:11px;color:#8E8E93;padding:4px 4px 0;">+ '+extra+' more</div>' : '');
+      }).join('');
 }
 
 function useHistory(idx){
