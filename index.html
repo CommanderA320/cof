@@ -2795,9 +2795,9 @@ function _renderHistory(){
   if(!el) return;
   if(!_queryHistory.length){ el.style.display='none'; return; }
   el.style.display='block';
-  el.innerHTML = '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:1px;margin-bottom:6px;">SON SORGULAR</div>'
+  el.innerHTML = '<div class="ai-examples-title">LAST QUERIES</div>'
     + _queryHistory.map(function(q,i){
-        return '<div onclick="useHistory('+i+')" style="cursor:pointer;padding:6px 10px;background:#F2F2F7;border-radius:8px;margin-bottom:4px;font-size:11px;color:#1C1C1E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="'+q.replace(/"/g,'&quot;')+'">'+q.substring(0,80)+(q.length>80?'…':'')+'</div>';
+        return '<div class="example-chip" onclick="useHistory('+i+')"><div class="example-chip-txt" style="font-size:13px;">'+q.substring(0,90)+(q.length>90?'…':'')+'</div></div>';
       }).join('');
 }
 
