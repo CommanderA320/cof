@@ -3538,8 +3538,6 @@ function runWXBrief() {
   var blk  = (document.getElementById('wx-block').value||'').trim();
 
   if(!dep || !dest) { alert('DEP ve DEST girin'); return; }
-  var apiKey = _ls('get','thy_api_key');
-  if(!apiKey) { alert('API key girilmemiş'); return; }
 
   var etaStr = '';
   if(etd && blk) {
@@ -3555,166 +3553,154 @@ function runWXBrief() {
   document.getElementById('wx-loading-txt').textContent = 'METAR · TAF çekiliyor...';
   document.getElementById('wx-result').className = 'wx-result';
 
-  var sysPrompt = 'Sen bir havacılık METAR/TAF veri çekme aracısın.\n' +
-    'SADECE aşağıdaki formatta yanıt ver, başka hiçbir şey ekleme:\n' +
-    'DEP_METAR: [tam raw metar satırı]\n' +
-    'DEP_WIND: [ddd/ssKT veya VRBssKT]\n' +
-    'DEP_VIS: [metre veya CAVOK]\n' +
-    'DEP_WX: [present weather codes veya NONE]\n' +
-    'DEST_TAF_ETA: [ETA penceresindeki TAF satırı]\n' +
-    'DEST_WIND_ETA: [ddd/ssKT veya VRBssKT]\n' +
-    'DEST_VIS_ETA: [metre veya CAVOK]\n' +
-    'DEST_WX_ETA: [wx codes veya NONE]';
+  var PROXY = 'https://api.allorigins.win/get?url=';
+  var BASE  = 'https://aviationweather.gov/api/data/';
 
-  var userPrompt = 'DEP:'+dep+' DEST:'+dest+(etaStr?' ETA:'+etaStr+'Z':'')+'\n' +
-    'Web search ile al:\n' +
-    '1. aviationweather.gov güncel METAR: '+dep+'\n' +
-    '2. aviationweather.gov güncel TAF: '+dest+(etaStr?', ETA '+etaStr+'Z penceresini bul':'')+'\n' +
-    'Sadece belirtilen formatta yanıt ver.';
+  var metarUrl = BASE + 'metar?ids=' + dep + '&format=raw&taf=false';
+  var tafUrl   = BASE + 'taf?ids='   + dest + '&format=raw';
 
-  fetch('https://api.anthropic.com/v1/messages', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true',
-      'x-api-key':apiKey
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6',
-      max_tokens:600,
-      tools:[{type:'web_search_20250305',name:'web_search',max_uses:2}],
-      system:sysPrompt,
-      messages:[{role:'user',content:userPrompt}]
-    })
+  Promise.all([
+    fetch(PROXY + encodeURIComponent(metarUrl)).then(function(r){return r.json();}),
+    fetch(PROXY + encodeURIComponent(tafUrl)).then(function(r){return r.json();})
+  ])
+  .then(function(results) {
+    var depMetarRaw  = (results[0].contents || '').trim() || 'N/A';
+    var destTafRaw   = (results[1].contents || '').trim() || 'N/A';
+
+    _renderWXResult(dep, dest, etaStr, depMetarRaw, destTafRaw);
   })
-  .then(function(r){
-    if(!r.ok) return r.json().then(function(e){throw new Error(e.error?e.error.message:'API '+r.status);});
-    return r.json();
-  })
-  .then(function(data){
+  .catch(function(err) {
     document.getElementById('wx-loading').className = 'wx-loading';
     document.getElementById('wx-send-btn').disabled = false;
-
-    var text = '';
-    if(data.content) data.content.forEach(function(b){if(b.type==='text')text+=b.text;});
-
-    // ── Parse response ──
-    function gv(key) {
-      var m = text.match(new RegExp(key+':\\s*(.+)'));
-      return m ? m[1].trim() : 'N/A';
-    }
-
-    var depMetar   = gv('DEP_METAR');
-    var depWindRaw = gv('DEP_WIND');
-    var depVisRaw  = gv('DEP_VIS');
-    var depWxRaw   = gv('DEP_WX');
-    var destTaf    = gv('DEST_TAF_ETA');
-    var destWindRaw= gv('DEST_WIND_ETA');
-    var destVisRaw = gv('DEST_VIS_ETA');
-    var destWxRaw  = gv('DEST_WX_ETA');
-
-    function parseWind(raw) {
-      var m = raw.match(/(\d{3})\/(\d{2,3})KT/i);
-      if(m) return {dir:parseInt(m[1]), spd:parseInt(m[2]), vrb:false};
-      var v = raw.match(/VRB(\d{2,3})KT/i);
-      if(v) return {dir:-1, spd:parseInt(v[1]), vrb:true};
-      return {dir:-1, spd:0, vrb:true};
-    }
-
-    var depWind  = parseWind(depWindRaw);
-    var destWind = parseWind(destWindRaw);
-
-    // ── RWYCC from METAR wx ──
-    var depRwycc  = _rwyccFromMetar(depWxRaw !== 'N/A' ? depWxRaw : depMetar);
-    var destRwycc = _rwyccFromMetar(destWxRaw !== 'N/A' ? destWxRaw : destTaf);
-
-    // ── Vis/LVP analysis ──
-    var depVis  = _visAnalysis(depMetar);
-    var destVis = _visAnalysis(destTaf);
-
-    // ── TAF deterioration ──
-    var destFlags = _tafDeterioration(destTaf);
-
-    // ── Runway analysis ──
-    var depRwy  = _analyzeRunways(dep,  depWind.dir,  depWind.spd,  depRwycc);
-    var destRwy = _analyzeRunways(dest, destWind.dir, destWind.spd, destRwycc);
-
-    // ── Overall status ──
-    function overallStatus(rwyLines, visData, rwyccData) {
-      var hasNogo = rwyLines.some(function(l){return l.indexOf('NO-GO')>-1;});
-      var hasGo   = rwyLines.some(function(l){return l.indexOf('🟢 GO')>-1;});
-      if(visData.cat === 'CAT IIIB' || visData.cat === 'CAT IIIA') return '🔴 NO-GO';
-      if(!hasGo && hasNogo) return '🔴 NO-GO';
-      if(visData.lvp || rwyccData.rwycc <= 3 || (hasNogo && hasGo)) return '🟡 CAUTION';
-      return '🟢 GO';
-    }
-
-    var depStatus  = overallStatus(depRwy.lines,  depVis,  depRwycc);
-    var destStatus = overallStatus(destRwy.lines, destVis, destRwycc);
-
-    // ── Build HTML ──
-    var now = new Date();
-    var ts = ('0'+now.getUTCHours()).slice(-2)+':'+('0'+now.getUTCMinutes()).slice(-2)+'Z';
-    document.getElementById('wx-result-time').textContent = ts;
-
-    function renderLines(lines) {
-      return lines.map(function(l){
-        return l
-          .replace(/🔴 NO-GO/g,'<span class="wx-badge-nogo">🔴 NO-GO</span>')
-          .replace(/🟡 CAUTION/g,'<span class="wx-badge-caution">🟡 CAUTION</span>')
-          .replace(/🟢 GO/g,'<span class="wx-badge-go">🟢 GO</span>');
-      }).join('<br>');
-    }
-
-    function renderStatus(s) {
-      if(s.indexOf('NO-GO')>-1) return '<span class="wx-badge-nogo" style="font-size:13px;padding:3px 10px;">'+s+'</span>';
-      if(s.indexOf('CAUTION')>-1) return '<span class="wx-badge-caution" style="font-size:13px;padding:3px 10px;">'+s+'</span>';
-      return '<span class="wx-badge-go" style="font-size:13px;padding:3px 10px;">'+s+'</span>';
-    }
-
-    var html = '';
-
-    // DEP section
-    html += '<div style="margin-bottom:14px;">';
-    html += '<div style="font-size:11px;font-weight:800;color:#8E8E93;letter-spacing:1px;margin-bottom:6px;">DEP: '+dep+'</div>';
-    html += '<div style="font-family:monospace;font-size:11px;color:#3A3A3C;background:#F2F2F7;padding:8px;border-radius:8px;margin-bottom:8px;word-break:break-all;">'+depMetar+'</div>';
-    html += '<div style="font-size:12px;margin-bottom:4px;"><b>RWYCC:</b> '+depRwycc.rwycc+' — '+depRwycc.label+'</div>';
-    if(depRwycc.note) html += '<div style="font-size:12px;color:#D70015;margin-bottom:4px;">'+depRwycc.note+'</div>';
-    if(depVis.flags.length) html += '<div style="font-size:12px;margin-bottom:6px;">'+depVis.flags.join('<br>')+'</div>';
-    html += '<div style="font-size:12px;font-family:monospace;line-height:1.8;">'+renderLines(depRwy.lines)+'</div>';
-    if(depRwy.best) html += '<div style="margin-top:6px;font-size:12px;font-weight:800;">✅ OPTİMAL: RWY '+depRwy.best+'</div>';
-    html += '<div style="margin-top:8px;">KALKIŞ: '+renderStatus(depStatus)+'</div>';
-    html += '</div>';
-
-    html += '<div style="border-top:1px solid #E5E5EA;margin:12px 0;"></div>';
-
-    // DEST section
-    html += '<div style="margin-bottom:14px;">';
-    html += '<div style="font-size:11px;font-weight:800;color:#8E8E93;letter-spacing:1px;margin-bottom:6px;">DEST: '+dest+(etaStr?' · ETA '+etaStr+'Z':'')+'</div>';
-    html += '<div style="font-family:monospace;font-size:11px;color:#3A3A3C;background:#F2F2F7;padding:8px;border-radius:8px;margin-bottom:8px;word-break:break-all;">'+destTaf+'</div>';
-    html += '<div style="font-size:12px;margin-bottom:4px;"><b>RWYCC tahmini:</b> '+destRwycc.rwycc+' — '+destRwycc.label+'</div>';
-    if(destRwycc.note) html += '<div style="font-size:12px;color:#D70015;margin-bottom:4px;">'+destRwycc.note+'</div>';
-    if(destFlags.length) html += '<div style="font-size:12px;margin-bottom:6px;">'+destFlags.join('<br>')+'</div>';
-    if(destVis.flags.length) html += '<div style="font-size:12px;margin-bottom:6px;">'+destVis.flags.join('<br>')+'</div>';
-    html += '<div style="font-size:12px;font-family:monospace;line-height:1.8;">'+renderLines(destRwy.lines)+'</div>';
-    if(destRwy.best) html += '<div style="margin-top:6px;font-size:12px;font-weight:800;">✅ OPTİMAL: RWY '+destRwy.best+'</div>';
-    html += '<div style="margin-top:8px;">İNİŞ: '+renderStatus(destStatus)+'</div>';
-    html += '</div>';
-
-    html += '<div style="border-top:1px solid #E5E5EA;margin:12px 0;"></div>';
-    html += '<div style="font-size:10px;color:#8E8E93;">RWYCC METAR wx kodundan türetilmiştir. Resmi SNOWTAM/ATIS ile teyit et.</div>';
-
-    document.getElementById('wx-result-body').innerHTML = html;
-    document.getElementById('wx-result').className = 'wx-result on';
-    document.getElementById('wx-result').scrollIntoView({behavior:'smooth'});
-  })
-  .catch(function(err){
-    document.getElementById('wx-loading').className = 'wx-loading';
-    document.getElementById('wx-send-btn').disabled = false;
-    document.getElementById('wx-result-body').innerHTML = '<span style="color:#D70015;font-weight:700;">Hata: '+err.message+'</span>';
+    document.getElementById('wx-result-body').innerHTML = '<span style="color:#D70015;font-weight:700;">Fetch hatası: '+err.message+'</span>';
     document.getElementById('wx-result').className = 'wx-result on';
   });
+}
+
+function _parseMetarWind(raw) {
+  if(!raw || raw==='N/A') return {dir:-1,spd:0,gust:0,vrb:true};
+  var g = raw.match(/(\d{3})(\d{2})(?:G(\d{2}))?KT/);
+  if(g) return {dir:parseInt(g[1]),spd:parseInt(g[2]),gust:g[3]?parseInt(g[3]):0,vrb:false};
+  var v = raw.match(/VRB(\d{2})(?:G(\d{2}))?KT/);
+  if(v) return {dir:-1,spd:parseInt(v[1]),gust:v[2]?parseInt(v[2]):0,vrb:true};
+  return {dir:-1,spd:0,gust:0,vrb:true};
+}
+
+function _parseTafWindForEta(tafRaw, etaStr) {
+  // Find the relevant group for ETA time
+  if(!tafRaw || tafRaw==='N/A') return {dir:-1,spd:0,gust:0,vrb:true,line:'N/A'};
+
+  var lines = tafRaw.split('\n');
+  var etaMin = -1;
+  if(etaStr) {
+    var ep = etaStr.split(':');
+    etaMin = parseInt(ep[0])*60 + parseInt(ep[1]);
+  }
+
+  // Find best matching TAF group
+  var bestLine = lines[0] || tafRaw;
+  // Look for BECMG/TEMPO/FM groups and find the one covering ETA
+  for(var i=0;i<lines.length;i++){
+    var l = lines[i];
+    // FM groups: FM1200 etc
+    var fm = l.match(/FM(\d{2})(\d{2})/);
+    if(fm && etaMin >= 0){
+      var fmMin = parseInt(fm[1])*60+parseInt(fm[2]);
+      if(fmMin <= etaMin) bestLine = l;
+    }
+  }
+
+  var w = _parseMetarWind(bestLine);
+  return {dir:w.dir,spd:w.spd,gust:w.gust,vrb:w.vrb,line:bestLine.trim()};
+}
+
+function _renderWXResult(dep, dest, etaStr, depMetarRaw, destTafRaw) {
+  document.getElementById('wx-loading').className = 'wx-loading';
+  document.getElementById('wx-send-btn').disabled = false;
+
+  // ── Parse ──
+  var depWind  = _parseMetarWind(depMetarRaw);
+  var destWind = _parseTafWindForEta(destTafRaw, etaStr);
+
+  // Use gust for crosswind check (Part-A: gust factor included)
+  var depSpd  = Math.max(depWind.spd,  depWind.gust);
+  var destSpd = Math.max(destWind.spd, destWind.gust);
+
+  var depRwycc  = _rwyccFromMetar(depMetarRaw);
+  var destRwycc = _rwyccFromMetar(destWind.line);
+
+  var depVis    = _visAnalysis(depMetarRaw);
+  var destDetFlags = _tafDeterioration(destTafRaw);
+
+  var depRwy    = _analyzeRunways(dep,  depWind.dir,  depSpd,  depRwycc);
+  var destRwy   = _analyzeRunways(dest, destWind.dir, destSpd, destRwycc);
+
+  // ── Overall ──
+  function overallStatus(rwyLines, visData, rwyccData) {
+    var hasNogo = rwyLines.some(function(l){return l.indexOf('NO-GO')>-1;});
+    var hasGo   = rwyLines.some(function(l){return l.indexOf('🟢')>-1;});
+    if(rwyccData.rwycc <= 1) return '🔴 NO-GO';
+    if(visData.cat === 'CAT IIIB' || visData.cat === 'CAT IIIA') return '🔴 NO-GO';
+    if(!hasGo) return '🔴 NO-GO';
+    if(visData.lvp || rwyccData.rwycc <= 3 || hasNogo) return '🟡 CAUTION';
+    return '🟢 GO';
+  }
+
+  var depStatus  = overallStatus(depRwy.lines,  depVis,  depRwycc);
+  var destStatus = overallStatus(destRwy.lines, {lvp:destDetFlags.length>0,cat:''}, destRwycc);
+
+  // ── Render ──
+  function badge(s){
+    if(s.indexOf('NO-GO')>-1)   return '<span class="wx-badge-nogo" style="font-size:13px;padding:3px 10px;">'+s+'</span>';
+    if(s.indexOf('CAUTION')>-1) return '<span class="wx-badge-caution" style="font-size:13px;padding:3px 10px;">'+s+'</span>';
+    return '<span class="wx-badge-go" style="font-size:13px;padding:3px 10px;">'+s+'</span>';
+  }
+  function rl(lines){
+    return lines.map(function(l){
+      return l.replace(/🔴 NO-GO/g,'<span class="wx-badge-nogo">🔴 NO-GO</span>')
+               .replace(/🟡 CAUTION/g,'<span class="wx-badge-caution">🟡 CAUTION</span>')
+               .replace(/🟢 GO/g,'<span class="wx-badge-go">🟢 GO</span>');
+    }).join('<br>');
+  }
+
+  var now = new Date();
+  var ts = ('0'+now.getUTCHours()).slice(-2)+':'+('0'+now.getUTCMinutes()).slice(-2)+'Z';
+  document.getElementById('wx-result-time').textContent = ts;
+
+  var html = '';
+
+  // DEP
+  html += '<div style="margin-bottom:12px;">';
+  html += '<div style="font-size:11px;font-weight:800;color:#8E8E93;letter-spacing:1px;margin-bottom:6px;">DEP: '+dep+'</div>';
+  html += '<div style="font-family:monospace;font-size:11px;color:#3A3A3C;background:#F2F2F7;padding:7px 8px;border-radius:8px;margin-bottom:7px;word-break:break-all;">'+depMetarRaw.split('\n')[0]+'</div>';
+  html += '<div style="font-size:12px;margin-bottom:3px;"><b>RWYCC:</b> '+depRwycc.rwycc+' ('+depRwycc.label+')'+(depWind.gust?' · GUST '+depWind.gust+'kt':'')+'</div>';
+  if(depRwycc.note) html += '<div style="font-size:12px;color:#D70015;margin-bottom:4px;">'+depRwycc.note+'</div>';
+  if(depVis.flags.length) html += '<div style="font-size:12px;margin-bottom:6px;line-height:1.7;">'+depVis.flags.join('<br>')+'</div>';
+  html += '<div style="font-size:12px;font-family:monospace;line-height:1.9;">'+rl(depRwy.lines)+'</div>';
+  if(depRwy.best) html += '<div style="margin-top:5px;font-size:12px;font-weight:800;">✅ OPTİMAL: RWY '+depRwy.best+'</div>';
+  html += '<div style="margin-top:8px;">KALKIŞ: '+badge(depStatus)+'</div>';
+  html += '</div>';
+
+  html += '<div style="border-top:1px solid #E5E5EA;margin:10px 0;"></div>';
+
+  // DEST
+  html += '<div style="margin-bottom:12px;">';
+  html += '<div style="font-size:11px;font-weight:800;color:#8E8E93;letter-spacing:1px;margin-bottom:6px;">DEST: '+dest+(etaStr?' · ETA '+etaStr+'Z':'')+'</div>';
+  html += '<div style="font-family:monospace;font-size:11px;color:#3A3A3C;background:#F2F2F7;padding:7px 8px;border-radius:8px;margin-bottom:7px;word-break:break-all;">'+destWind.line+'</div>';
+  html += '<div style="font-size:12px;margin-bottom:3px;"><b>RWYCC tahmini:</b> '+destRwycc.rwycc+' ('+destRwycc.label+')'+(destWind.gust?' · GUST '+destWind.gust+'kt':'')+'</div>';
+  if(destRwycc.note) html += '<div style="font-size:12px;color:#D70015;margin-bottom:4px;">'+destRwycc.note+'</div>';
+  if(destDetFlags.length) html += '<div style="font-size:12px;margin-bottom:6px;line-height:1.7;">'+destDetFlags.join('<br>')+'</div>';
+  html += '<div style="font-size:12px;font-family:monospace;line-height:1.9;">'+rl(destRwy.lines)+'</div>';
+  if(destRwy.best) html += '<div style="margin-top:5px;font-size:12px;font-weight:800;">✅ OPTİMAL: RWY '+destRwy.best+'</div>';
+  html += '<div style="margin-top:8px;">İNİŞ: '+badge(destStatus)+'</div>';
+  html += '</div>';
+
+  html += '<div style="border-top:1px solid #E5E5EA;margin:10px 0;"></div>';
+  html += '<div style="font-size:10px;color:#8E8E93;line-height:1.6;">RWYCC METAR wx kodundan türetildi. SNOWTAM/ATIS/OCC ile teyit et.</div>';
+
+  document.getElementById('wx-result-body').innerHTML = html;
+  document.getElementById('wx-result').className = 'wx-result on';
+  document.getElementById('wx-result').scrollIntoView({behavior:'smooth'});
 }
 </script>
 
