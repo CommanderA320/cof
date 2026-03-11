@@ -107,32 +107,8 @@
       ]
     },
     {
-      "id": "p05",
-      "code": "03",
-      "title": "Aircraft Security Search",
-      "sub": "Before Boarding --- FR.73.0001",
-      "emoji": "clipboard",
-      "treePhase": false,
-      "items": [
-        {
-          "id": "p05a",
-          "ref": "8.2.2.1(F)",
-          "level": "SHALL",
-          "text": "FR.73.0001 Aircraft Security Search Checklist completed for flight deck and cabin prior to passenger embarkation. Security search must be successfully completed before boarding commences.",
-          "detail": "Prior to each departure, aeroplane shall be subjected to FR.73.0001 Aircraft Security Search Checklist in order to ensure that no prohibited articles are present on board. Prior to passenger embarkation, flight deck and the cabin security search shall be successfully completed. This is a mandatory requirement before any boarding approval is given."
-        },
-        {
-          "id": "p05b",
-          "ref": "8.2.2.1.2(B)(C)(D)",
-          "level": "SHALL",
-          "text": "At transit stops: cabin crew performs security search of aeroplane. If no findings: passenger embarkation may recommence. If finding: unidentified item not displaced, appropriate security department notified, local authority security procedures applied.",
-          "detail": "Cabin crew members shall perform a security search of the aeroplane at transit stops in accordance with Subchapter 10.1.10. If the security search reveals no findings, passenger embarkation may recommence. If the security search reveals a finding: unidentified item(s) in the cabin shall not be displaced; appropriate security department shall be notified; security procedures of the local authority shall be applicable."
-        }
-      ]
-    },
-    {
       "id": "p04",
-      "code": "04",
+      "code": "03",
       "title": "Cabin Crew Briefing",
       "sub": "Before Boarding --- Emergency & Operational Briefing",
       "emoji": "people",
@@ -165,6 +141,30 @@
           "level": "SHALL",
           "text": "Required crew members confirmed on board or due on board at least 15 minutes prior to scheduled departure time. If Commander determines required crew will not be on board 15 minutes prior to departure: boarding shall not be approved or initiated.",
           "detail": "Crew scheduling department is responsible for ensuring required crew members are ready for duty on board at least 15 minutes prior to the scheduled departure time. If the Commander feels that the required crew members will not be on board 15 minutes prior to departure, he shall not approve/initiate the boarding process."
+        }
+      ]
+    },
+    {
+      "id": "p05",
+      "code": "04",
+      "title": "Aircraft Security Search",
+      "sub": "Before Boarding --- FR.73.0001",
+      "emoji": "clipboard",
+      "treePhase": false,
+      "items": [
+        {
+          "id": "p05a",
+          "ref": "8.2.2.1(F)",
+          "level": "SHALL",
+          "text": "FR.73.0001 Aircraft Security Search Checklist completed for flight deck and cabin prior to passenger embarkation. Security search must be successfully completed before boarding commences.",
+          "detail": "Prior to each departure, aeroplane shall be subjected to FR.73.0001 Aircraft Security Search Checklist in order to ensure that no prohibited articles are present on board. Prior to passenger embarkation, flight deck and the cabin security search shall be successfully completed. This is a mandatory requirement before any boarding approval is given."
+        },
+        {
+          "id": "p05b",
+          "ref": "8.2.2.1.2(B)(C)(D)",
+          "level": "SHALL",
+          "text": "At transit stops: cabin crew performs security search of aeroplane. If no findings: passenger embarkation may recommence. If finding: unidentified item not displaced, appropriate security department notified, local authority security procedures applied.",
+          "detail": "Cabin crew members shall perform a security search of the aeroplane at transit stops in accordance with Subchapter 10.1.10. If the security search reveals no findings, passenger embarkation may recommence. If the security search reveals a finding: unidentified item(s) in the cabin shall not be displaced; appropriate security department shall be notified; security procedures of the local authority shall be applicable."
         }
       ]
     },
