@@ -1125,46 +1125,24 @@ function _bm25MultiSearch(query, aircraftMSN) {
   try {
     var qrhText = _getDocText('QRH');
     if(qrhText) {
-      // Step 1: Extract LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN page from QRH
-      var listPageText = '';
+      // Find LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN page
       var listIdx = qrhText.search(/LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN/i);
       if(listIdx > -1) {
-        // Take up to 4000 chars from that point — covers the full table
-        listPageText = qrhText.substring(listIdx, Math.min(qrhText.length, listIdx + 4000));
-      }
-
-      // Step 2: Extract exact ECAM alert title from user query
-      // ECAM title is everything after "ecam" keyword, or the whole query if no keyword
-      var ecamTitleMatch = query.match(/(?:ecam[\s]+)([\w\s\(\)\/\+\-]+?)(?:[\s]*$|[\s]*,)/i);
-      var ecamTitle = ecamTitleMatch ? ecamTitleMatch[1].trim() : query.trim();
-
-      // Step 3: Build OEB context block
-      var oebFound = false;
-      var noOebFound = false;
-
-      if(listPageText) {
-        // Check if exact ECAM title appears in the list page
-        if(listPageText.toLowerCase().indexOf(ecamTitle.toLowerCase()) > -1) {
-          oebFound = true;
-        }
-        if(/No Operations Engineering Bulletin impacting QRH/i.test(listPageText)) {
-          noOebFound = true;
-        }
-
-        oebContext = '\n=== QRH LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN PAGE ===\n'
-          + 'ECAM TITLE SEARCHED: ' + ecamTitle + '\n'
-          + (oebFound ? 'TITLE FOUND IN LIST: YES — OEB EXISTS. Execute OEB procedure BEFORE ECAM.\n'
-             : noOebFound ? 'TITLE FOUND IN LIST: NO — page states No Operations Engineering Bulletin impacting QRH. Proceed directly to ECAM.\n'
-             : 'TITLE FOUND IN LIST: NOT CONFIRMED — read the table below carefully.\n')
-          + '--- TABLE CONTENT ---\n'
-          + listPageText + '\n=== END OEB LIST ===\n';
-
+        // Extract the table content (up to 3000 chars)
+        var tableText = qrhText.substring(listIdx, Math.min(qrhText.length, listIdx + 3000));
+        oebContext = '\n=== QRH: LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN ===\n'
+          + 'THIS IS THE EXACT TABLE FROM THE QRH. Read the Title column carefully.\n'
+          + 'INSTRUCTION: Find the exact ECAM alert title in the Title column below.\n'
+          + '- If found → OEB exists. Note the Identification number. Execute OEB BEFORE ECAM.\n'
+          + '- If table says "No Operations Engineering Bulletin impacting QRH" → no OEB, go to ECAM.\n'
+          + '--- BEGIN TABLE ---\n'
+          + tableText
+          + '\n--- END TABLE ---\n=== END OEB SECTION ===\n';
       } else {
-        // LIST OF EFFECTIVE page not found in loaded QRH text
-        oebContext = '\n=== QRH LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN PAGE ===\n'
-          + 'WARNING: LIST OF EFFECTIVE page not found in loaded QRH text. '
+        oebContext = '\n=== QRH: LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN ===\n'
+          + 'WARNING: This page was not found in the loaded QRH text.\n'
           + 'Physical QRH check MANDATORY before ECAM execution.\n'
-          + '=== END OEB LIST ===\n';
+          + '=== END OEB SECTION ===\n';
       }
     }
   } catch(e) {}
