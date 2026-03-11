@@ -614,8 +614,14 @@ function _loadDocFromGitHub(docCode, cb){
     try{
       var key = 'doc_text_'+docCode;
       // Only store if under 4MB (localStorage limit safety)
-      if(t.length < 4000000) localStorage.setItem(key, t);
-    }catch(e){}
+      if(t.length < 4000000) {
+        localStorage.setItem(key, t);
+        // Verify it was saved
+        if(!localStorage.getItem(key)) {
+          sessionStorage.setItem(key, t);
+        }
+      }
+    }catch(e){ try{ sessionStorage.setItem('doc_text_'+docCode, t); }catch(e2){} }
     // Parse MSN allocation table if this doc contains one
     try{
       if(t.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i) > -1){
@@ -1123,13 +1129,14 @@ function _bm25MultiSearch(query, aircraftMSN) {
   // Extract ECAM alert title from query (words in CAPS or after 'ecam')
   var oebContext = '';
   try {
-    // Try QRH first, then scan ALL loaded docs for OEB list page
-    var qrhText = _getDocText('QRH') || '';
+    // Try _docCache first (in-memory, most reliable), then localStorage
+    var qrhText = (_docCache && _docCache['QRH']) || _getDocText('QRH') || '';
     
     // If QRH empty, scan all REFERENCES for the one containing LIST OF EFFECTIVE
     if(!qrhText || qrhText.length < 100) {
       for(var ri = 0; ri < REFERENCES.length; ri++) {
-        var rt = _getDocText(REFERENCES[ri].code);
+        var rcode = REFERENCES[ri].code;
+        var rt = (_docCache && _docCache[rcode]) || _getDocText(rcode) || '';
         if(rt && rt.length > 100 && /LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN/i.test(rt)) {
           qrhText = rt;
           break;
