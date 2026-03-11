@@ -320,6 +320,39 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .pwa-install-btn{background:#E30613;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .pwa-dismiss{background:none;border:none;color:#AEAEB2;font-size:22px;cursor:pointer;line-height:1;padding:0 2px;}
 
+
+/* ===== WX BRIEF SCREEN ===== */
+#wx-screen{display:none;position:fixed;inset:0;background:#F2F2F7;z-index:300;flex-direction:column;max-width:430px;margin:0 auto;}
+#wx-screen.on{display:flex;}
+.wx-topbar{background:#fff;padding:16px 20px 12px;padding-top:max(env(safe-area-inset-top,16px),16px);border-bottom:1px solid #E5E5EA;display:flex;align-items:center;gap:12px;}
+.wx-back{background:#F2F2F7;border:none;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;color:#E30613;cursor:pointer;}
+.wx-header-title{font-size:15px;font-weight:800;color:#1C1C1E;}
+.wx-header-sub{font-size:10px;color:#8E8E93;font-weight:600;}
+.wx-body{flex:1;overflow-y:auto;padding:16px;}
+.wx-card{background:#fff;border-radius:14px;border:1px solid #E5E5EA;padding:14px;margin-bottom:12px;}
+.wx-card-title{font-size:10px;font-weight:800;color:#8E8E93;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;}
+.wx-row{display:flex;gap:8px;margin-bottom:8px;}
+.wx-input-wrap{flex:1;display:flex;flex-direction:column;gap:4px;}
+.wx-label{font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:0.5px;}
+.wx-input{background:#F2F2F7;border:none;border-radius:8px;padding:10px 12px;font-size:14px;font-weight:700;color:#1C1C1E;font-family:monospace;width:100%;box-sizing:border-box;text-transform:uppercase;}
+.wx-input::placeholder{color:#C7C7CC;font-weight:400;}
+.wx-send-btn{width:100%;background:#007AFF;color:#fff;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:0.3px;margin-top:4px;}
+.wx-send-btn:disabled{background:#C7C7CC;}
+.wx-loading{display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:30px;}
+.wx-loading.on{display:flex;}
+.wx-loading-txt{font-size:12px;font-weight:700;color:#8E8E93;}
+.wx-result{background:#fff;border-radius:12px;border:1px solid #E5E5EA;padding:14px;margin-bottom:12px;display:none;}
+.wx-result.on{display:block;}
+.wx-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #F2F2F7;}
+.wx-result-title{font-size:12px;font-weight:800;color:#1C1C1E;letter-spacing:0.5px;}
+.wx-result-time{font-size:10px;color:#34C759;font-family:monospace;font-weight:700;}
+.wx-result-body{font-size:13px;color:#1C1C1E;line-height:1.7;white-space:pre-wrap;}
+.wx-badge-go{display:inline-block;background:#1A7A3A;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;}
+.wx-badge-caution{display:inline-block;background:#FF9500;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;}
+.wx-badge-nogo{display:inline-block;background:#D70015;color:#fff;font-weight:800;padding:2px 8px;border-radius:4px;font-size:11px;}
+.wx-fab{position:fixed;bottom:88px;right:16px;background:#007AFF;border:none;border-radius:16px;padding:10px 14px;display:flex;align-items:center;gap:6px;box-shadow:0 4px 16px rgba(0,122,255,0.4);z-index:200;cursor:pointer;}
+.wx-fab-txt{font-size:12px;font-weight:800;color:#fff;}
+
 </style>
 </head>
 <body>
@@ -3187,7 +3220,157 @@ _loadData(function(){
     document.getElementById('list').innerHTML = '<div style="padding:20px;color:#D70015;font-family:monospace;font-size:12px;white-space:pre-wrap;padding:20px;">RENDER ERROR: ' + e.message + '</div>';
   }
 });
+
+// ===== WX BRIEF =====
+function openWX() {
+  document.getElementById('wx-screen').className = 'on';
+}
+function closeWX() {
+  document.getElementById('wx-screen').className = '';
+}
+
+function _wxFormatResult(text) {
+  text = text
+    .replace(/\bNO-GO\b/g, '<span class="wx-badge-nogo">NO-GO</span>')
+    .replace(/\bCAUTION\b/g, '<span class="wx-badge-caution">CAUTION</span>')
+    .replace(/\bGO\b/g, '<span class="wx-badge-go">GO</span>')
+    .replace(/🟢/g, '<span style="color:#1A7A3A;font-weight:800;">🟢</span>')
+    .replace(/🟡/g, '<span style="color:#FF9500;font-weight:800;">🟡</span>')
+    .replace(/🔴/g, '<span style="color:#D70015;font-weight:800;">🔴</span>');
+  return text;
+}
+
+function runWXBrief() {
+  var dep   = (document.getElementById('wx-dep').value||'').trim().toUpperCase();
+  var dest  = (document.getElementById('wx-dest').value||'').trim().toUpperCase();
+  var etd   = (document.getElementById('wx-etd').value||'').trim();
+  var block = (document.getElementById('wx-block').value||'').trim();
+
+  if(!dep || !dest) { alert('DEP ve DEST girin'); return; }
+
+  var apiKey = _ls('get','thy_api_key');
+  if(!apiKey) { alert('API key girilmemiş'); return; }
+
+  // Calculate ETA
+  var etaStr = '';
+  if(etd && block) {
+    try {
+      var etdParts = etd.split(':');
+      var blkParts = block.split(':');
+      var etdMin = parseInt(etdParts[0])*60 + parseInt(etdParts[1]);
+      var blkMin = parseInt(blkParts[0])*60 + parseInt(blkParts[1]);
+      var etaMin = (etdMin + blkMin) % (24*60);
+      var etaH = Math.floor(etaMin/60);
+      var etaM = etaMin%60;
+      etaStr = (etaH<10?'0':'')+etaH+':'+(etaM<10?'0':'')+etaM;
+    } catch(e){}
+  }
+
+  document.getElementById('wx-send-btn').disabled = true;
+  document.getElementById('wx-loading').className = 'wx-loading on';
+  document.getElementById('wx-result').className = 'wx-result';
+
+  var systemPrompt = 'You are a Turkish Airlines A320 Commander operational weather briefing system.\n' +
+    'You MUST use web search to fetch LIVE data. Do NOT use cached or example data.\n\n' +
+    'PART-A WIND LIMITS (Turkish Airlines Operations Manual):\n' +
+    'RWYCC 6 DRY width>45m: XW 30kt gust 30kt TW 10kt HW 50kt\n' +
+    'RWYCC 6 DRY width 40-45m: XW 30kt TW 10kt\n' +
+    'RWYCC 5 GOOD: XW 25kt TW 10kt\n' +
+    'RWYCC 4 GOOD-MEDIUM: XW 20kt gust 28kt TW 10kt\n' +
+    'RWYCC 3 MEDIUM: XW 15kt gust 21kt TW 10kt\n' +
+    'RWYCC 2 MED-POOR: XW 10kt gust 5kt TW ops not permitted\n' +
+    'RWYCC 1 POOR or 0 NIL: OPS NOT PERMITTED\n' +
+    'NARROW RWY (width<45m): XW reduced by (45-actual_width)*0.3 knots\n' +
+    'SHORT RWY (TORA/LDA<1982m): min vis 1500m GOOD braking required\n\n' +
+    'WIND COMPONENTS: XW=speed*sin(angle) HW/TW=speed*cos(angle)\n\n' +
+    'OUTPUT — MANDATORY SECTIONS IN TURKISH:\n' +
+    '--- DEP: [ICAO] ---\n' +
+    'METAR: [raw]\n' +
+    'PIST VERILERI: [tum pistler: yonu, uzunluk, genislik]\n' +
+    'RUZGAR ANALIZI:\n' +
+    '  RWY XX: HW Xkt | XW Xkt | 🟢 GO / 🟡 CAUTION / 🔴 NO-GO — sebep\n' +
+    'OPTIMAL KALKIS PISTI: [oneri]\n' +
+    'PART-A UYARILARI: [ozel kisitlamalar]\n\n' +
+    '--- DEST: [ICAO] ---\n' +
+    'TAF (ETA penceresi): [ilgili satirlar]\n' +
+    'PIST VERILERI: [tum pistler]\n' +
+    'RUZGAR ANALIZI (ETA ruzgari):\n' +
+    '  RWY XX: HW Xkt | XW Xkt | 🟢 GO / 🟡 CAUTION / 🔴 NO-GO — sebep\n' +
+    'OPTIMAL INIS PISTI: [oneri]\n' +
+    'PART-A UYARILARI: [dar/kisa pist, kontaminasyon, LVP]\n\n' +
+    '--- GENEL DEGERLENDIRME ---\n' +
+    'KALKIS: 🟢 GO / 🟡 CAUTION / 🔴 NO-GO\n' +
+    'INIS: 🟢 GO / 🟡 CAUTION / 🔴 NO-GO\n' +
+    'KOMUTAN NOTLARI: [kritik maddeler]';
+
+  var userPrompt = 'WX BRIEF TALEBI:\n' +
+    'DEP: ' + dep + '\nDEST: ' + dest + '\n' +
+    (etd ? 'ETD: ' + etd + ' UTC\n' : '') +
+    (block ? 'BLOCK: ' + block + '\n' : '') +
+    (etaStr ? 'ETA: ' + etaStr + ' UTC\n' : '') +
+    '\nLutfen su adimlari izle:\n' +
+    '1. aviationweather.gov/api/data/metar?ids=' + dep + '&format=raw adresinden guncel METAR al\n' +
+    '2. aviationweather.gov/api/data/taf?ids=' + dest + '&format=raw adresinden guncel TAF al\n' +
+    '3. ' + dep + ' havalimaninin tum pistlerinin yonu, uzunlugu ve genisligini bul\n' +
+    '4. ' + dest + ' havalimaninin tum pistlerinin yonu, uzunlugu ve genisligini bul\n' +
+    '5. Ruzgar bilesenlerini hesapla ve Part-A limitleriyle karsilastir\n' +
+    '6. Tam WX BRIEF raporunu olustur';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 16000,
+      tools: [{type: 'web_search_20250305', name: 'web_search', max_uses: 8}],
+      system: systemPrompt,
+      messages: [{role: 'user', content: userPrompt}]
+    })
+  })
+  .then(function(r) {
+    if(!r.ok) {
+      return r.json().then(function(e) { throw new Error(e.error ? e.error.message : 'API error '+r.status); });
+    }
+    return r.json();
+  })
+  .then(function(data) {
+    document.getElementById('wx-loading').className = 'wx-loading';
+    document.getElementById('wx-send-btn').disabled = false;
+    var text = '';
+    if(data.content) {
+      data.content.forEach(function(block) {
+        if(block.type === 'text') text += block.text;
+      });
+    }
+    var now = new Date();
+    var ts = ('0'+now.getUTCHours()).slice(-2)+':'+('0'+now.getUTCMinutes()).slice(-2)+'Z';
+    document.getElementById('wx-result-time').textContent = ts;
+    document.getElementById('wx-result-body').innerHTML = _wxFormatResult(text.replace(/\n/g,'<br>'));
+    document.getElementById('wx-result').className = 'wx-result on';
+    document.getElementById('wx-result').scrollIntoView({behavior:'smooth'});
+  })
+  .catch(function(err) {
+    document.getElementById('wx-loading').className = 'wx-loading';
+    document.getElementById('wx-send-btn').disabled = false;
+    document.getElementById('wx-result-body').innerHTML = '<span style="color:#D70015;font-weight:700;">Hata: '+err.message+'</span>';
+    document.getElementById('wx-result').className = 'wx-result on';
+  });
+}
 </script>
+
+
+<!-- WX BRIEF FAB -->
+<button class="wx-fab" onclick="openWX()">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="#fff"/>
+  </svg>
+  <span class="wx-fab-txt">WX</span>
+</button>
 
 <!-- AI FAB BUTTON -->
 <button class="ai-fab" onclick="openAI()">
@@ -3287,6 +3470,61 @@ _loadData(function(){
   </div>
 </div>
 
+
+
+<!-- ===== WX BRIEF SCREEN ===== -->
+<div id="wx-screen">
+  <div class="wx-topbar">
+    <button class="wx-back" onclick="closeWX()">&#8592; Back</button>
+    <div>
+      <div class="wx-header-title">WX BRIEF</div>
+      <div class="wx-header-sub">Part-A Weather &amp; Runway Compliance</div>
+    </div>
+  </div>
+
+  <div class="wx-body" id="wx-body">
+    <!-- Input Card -->
+    <div class="wx-card" id="wx-input-card">
+      <div class="wx-card-title">Flight Details</div>
+      <div class="wx-row">
+        <div class="wx-input-wrap">
+          <span class="wx-label">DEP (ICAO)</span>
+          <input class="wx-input" id="wx-dep" maxlength="4" placeholder="LTFJ" autocomplete="off" oninput="this.value=this.value.toUpperCase()"/>
+        </div>
+        <div class="wx-input-wrap">
+          <span class="wx-label">DEST (ICAO)</span>
+          <input class="wx-input" id="wx-dest" maxlength="4" placeholder="LIME" autocomplete="off" oninput="this.value=this.value.toUpperCase()"/>
+        </div>
+      </div>
+      <div class="wx-row">
+        <div class="wx-input-wrap">
+          <span class="wx-label">ETD (UTC)</span>
+          <input class="wx-input" id="wx-etd" maxlength="5" placeholder="08:15" autocomplete="off"/>
+        </div>
+        <div class="wx-input-wrap">
+          <span class="wx-label">BLOCK (HH:MM)</span>
+          <input class="wx-input" id="wx-block" maxlength="5" placeholder="03:00" autocomplete="off"/>
+        </div>
+      </div>
+      <button class="wx-send-btn" id="wx-send-btn" onclick="runWXBrief()">⛅ WX BRIEF AL</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="wx-loading" id="wx-loading">
+      <div style="font-size:28px;">⛅</div>
+      <div class="wx-loading-txt" id="wx-loading-txt">METAR · TAF · RUNWAY DATA çekiliyor...</div>
+    </div>
+
+    <!-- Result -->
+    <div class="wx-result" id="wx-result">
+      <div class="wx-result-header">
+        <div class="wx-result-title">WX BRIEF RAPORU</div>
+        <div class="wx-result-time" id="wx-result-time"></div>
+      </div>
+      <div class="wx-result-body" id="wx-result-body"></div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== EDIT SCREEN ===== -->
 <div id="edit-screen">
