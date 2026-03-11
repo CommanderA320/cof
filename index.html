@@ -3044,7 +3044,7 @@ function sendQuery() {
     if(docContext) contextBlock += docContext;
   }
 
-  var userContent = 'AIRCRAFT TYPE: A320 series\nOPERATOR: Turkish Airlines\n';
+  var userContent = 'OPERATOR: Turkish Airlines\n';
   var acInfo = _getAircraftInfo(registration);
   var msnInfo = _getMSNForReg(registration); // from parsed FCOM allocation table
   if(registration){
@@ -3056,10 +3056,10 @@ function sendQuery() {
     } else if(acInfo){
       typeStr = acInfo.type;
     }
-    userContent += 'REGISTRATION: '+registration;
+    userContent += 'AIRCRAFT: '+registration;
     if(msnStr) userContent += ' | MSN: '+msnStr;
     if(typeStr) userContent += ' | MODEL: '+typeStr;
-    if(acInfo) userContent += ' | ENGINE: '+acInfo.engine;
+    if(acInfo) userContent += ' | TYPE: '+acInfo.type+' | ENGINE: '+acInfo.engine;
     userContent += '\n';
     if(acInfo){
       userContent += 'WEIGHTS: MTOW '+acInfo.mtow+'kg | MLW '+acInfo.mlw+'kg | MZFW '+acInfo.mzfw+'kg\n';
