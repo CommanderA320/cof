@@ -3075,6 +3075,20 @@ function shareReport() {
 }
 
 function sendQuery() {
+  // Ensure QRH is in _docCache before proceeding (needed for OEB check)
+  if(!_docCache['QRH'] && !localStorage.getItem('doc_text_QRH')) {
+    var _sq_input = document.getElementById("ai-input").value.trim();
+    if(_sq_input) {
+      // Show loading indicator
+      var sendBtn = document.getElementById("ai-send-btn");
+      if(sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
+      _loadDocFromGitHub('QRH', function(err, text) {
+        if(sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '▶'; }
+        sendQuery(); // retry after QRH loaded
+      });
+      return;
+    }
+  }
   var input = document.getElementById("ai-input").value.trim();
   if (!input) return;
 
