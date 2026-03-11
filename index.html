@@ -782,7 +782,7 @@ function _renderDocManager(){
     info.innerHTML = '<div class="doc-title">'+ref.title+'</div>'
       +(ref.rev?'<div class="doc-meta">'+ref.rev+'</div>':'')
       +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB — ☁️ GitHub</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
-      +(progress?'<div class="doc-progress">'+progress+'</div>':'');
+      +(!hasDoc && progress?'<div class="doc-progress">'+progress+'</div>':'');
 
     // Label wrapping input — works natively in Safari without .click()
     var fileInput = document.createElement('input');
