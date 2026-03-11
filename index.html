@@ -168,7 +168,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-context-body.open{max-height:300px;}
 @keyframes pulse-blue{0%,100%{opacity:1;}50%{opacity:0.4;}}
 .ctx-loading{animation:pulse-blue 1.2s infinite;color:#007AFF !important;font-weight:700;}
-.ai-reg-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #F2F2F7;}
+.ai-reg-row{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #E5E5EA;}
 .ai-reg-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
 .ai-reg-input{width:80px;flex:none;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F2F2F7;outline:none;text-transform:uppercase;}
 .ai-reg-input:focus{border-color:#E30613;background:#fff;}
@@ -3253,13 +3253,11 @@ _loadData(function(){
         <div class="ai-context-tags" id="ai-doc-tags" style="margin-top:8px;">
           <span class="ctx-tag ctx-loading">⏳ Documents loading...</span>
         </div>
-        <div class="ai-reg-row" onclick="event.stopPropagation()">
+      </div><!-- end ai-context-body -->
+      <div class="ai-reg-row" onclick="event.stopPropagation()">
         <span class="ai-reg-label">✈ Reg</span>
         <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);_updateRegBadge();" />
         <span id="ai-reg-badge" class="ai-reg-badge none">—</span>
-
-        <span style="font-size:11px;color:#8E8E93;">MEL auto-link</span>
-        </div>
       </div>
     </div>
 
