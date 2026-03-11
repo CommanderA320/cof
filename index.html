@@ -158,13 +158,21 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-header-title{font-size:16px;font-weight:900;color:#1C1C1E;}
 .ai-header-sub{font-size:10px;color:#636366;margin-top:1px;}
 .ai-model-badge{background:#F0FFF4;border:1px solid #C6F6D5;border-radius:8px;padding:4px 8px;font-size:9px;font-weight:800;color:#1A7A3A;white-space:nowrap;}
-.ai-body{flex:1;overflow-y:auto;padding:16px 16px 0;}
-.ai-context-box{background:#fff;border-radius:12px;border:1px solid #E5E5EA;padding:12px 14px;margin-bottom:12px;}
+.ai-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 16px 0;}
+.ai-context-box{background:#F8F8F8;border-radius:12px;border:1px solid #E5E5EA;padding:10px 14px;margin-bottom:12px;cursor:pointer;user-select:none;}
+.ai-context-header{display:flex;align-items:center;justify-content:space-between;}
+.ai-context-title{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;}
+.ai-context-chevron{font-size:11px;color:#8E8E93;transition:transform 0.2s;}
+.ai-context-chevron.open{transform:rotate(180deg);}
+.ai-context-body{overflow:hidden;max-height:0;transition:max-height 0.25s ease;}
+.ai-context-body.open{max-height:300px;}
+@keyframes pulse-blue{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.ctx-loading{animation:pulse-blue 1.2s infinite;color:#007AFF !important;font-weight:700;}
 .ai-reg-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #F2F2F7;}
 .ai-reg-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
-.ai-reg-input{flex:1;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F9F9F9;text-transform:uppercase;outline:none;}
+.ai-reg-input{width:80px;flex:none;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F2F2F7;outline:none;text-transform:uppercase;}
 .ai-reg-input:focus{border-color:#E30613;background:#fff;}
-.ai-reg-badge{font-size:10px;font-weight:700;padding:3px 7px;border-radius:10px;white-space:nowrap;letter-spacing:0.2px;}
+.ai-reg-badge{font-size:10px;font-weight:700;padding:3px 7px;border-radius:10px;white-space:nowrap;letter-spacing:0.2px;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
 .ai-reg-badge.ok{background:#E8F5E9;color:#1A7A3A;border:1px solid #A5D6A7;}
 .ai-reg-badge.warn{background:#FFF8E1;color:#B45309;border:1px solid #FFD54F;}
 .ai-reg-badge.none{background:#F2F2F7;color:#8E8E93;border:1px solid #E5E5EA;}
@@ -2414,8 +2422,7 @@ function buildCard(item,idx,glen,locked,parent){
     var ref = item.ref || "";
     _openInDoc(docCode, ref);
   };
-  var db2=document.createElement("button");db2.className="dbtn";db2.textContent="Add Note";
-  dbtns.appendChild(db1);dbtns.appendChild(db2);
+  dbtns.appendChild(db1);
   det.appendChild(dtxt);det.appendChild(dbtns);
   card.appendChild(det);
   parent.appendChild(card);
@@ -2559,17 +2566,33 @@ function openAI() {
 
   function _updateDocTags(statusMsg){
     var tagsEl = document.getElementById('ai-doc-tags');
+    var titleEl = document.getElementById('ai-context-title');
     if(!tagsEl) return;
     if(statusMsg){
-      tagsEl.innerHTML = '<span class="ctx-tag" style="color:#007AFF;">'+statusMsg+'</span>';
+      tagsEl.innerHTML = '<span class="ctx-tag ctx-loading">⏳ '+statusMsg+'</span>';
+      if(titleEl) titleEl.textContent = 'Documents loading...';
       return;
     }
+    var total = REFERENCES.length;
+    var loaded = REFERENCES.filter(function(r){ return _docAvailable(r.code); }).length;
+    if(titleEl) titleEl.textContent = loaded < total
+      ? 'Sources: '+loaded+'/'+total+' loading...'
+      : 'Sources ready ✓ ('+total+' docs)';
     var tags = '';
     REFERENCES.forEach(function(ref){
-      var loaded = _docAvailable(ref.code);
-      tags += '<span class="ctx-tag doc'+(loaded?' loaded':'')+'" title="'+ref.code+'">'+ref.title+(loaded?' ✓':'')+'</span>';
+      var ok = _docAvailable(ref.code);
+      tags += '<span class="ctx-tag doc'+(ok?' loaded':'')+'" title="'+ref.code+'">'+ref.title+(ok?' ✓':'')+'</span>';
     });
     tagsEl.innerHTML = tags;
+  }
+
+  function toggleContextBox() {
+    var body = document.getElementById('ai-context-body');
+    var chev = document.getElementById('ai-context-chevron');
+    if(!body) return;
+    var isOpen = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    if(chev) chev.classList.toggle('open', !isOpen);
   }
 
   _updateDocTags();
@@ -3221,17 +3244,22 @@ _loadData(function(){
 
   <div class="ai-body" id="ai-body">
     <!-- Context box -->
-    <div class="ai-context-box">
-      <div class="ai-context-title">Active Document Context</div>
-      <div class="ai-context-tags" id="ai-doc-tags">
-        <span class="ctx-tag doc">Loading...</span>
+    <div class="ai-context-box" id="ai-context-box" onclick="toggleContextBox()">
+      <div class="ai-context-header">
+        <div class="ai-context-title" id="ai-context-title">Active Document Context</div>
+        <span class="ai-context-chevron" id="ai-context-chevron">▼</span>
       </div>
-      <div class="ai-reg-row">
+      <div class="ai-context-body" id="ai-context-body">
+        <div class="ai-context-tags" id="ai-doc-tags" style="margin-top:8px;">
+          <span class="ctx-tag ctx-loading">⏳ Documents loading...</span>
+        </div>
+        <div class="ai-reg-row" onclick="event.stopPropagation()">
         <span class="ai-reg-label">✈ Reg</span>
         <input class="ai-reg-input" id="ai-reg-input" type="text" maxlength="8" placeholder="TC-JXX" autocomplete="off" autocapitalize="characters" oninput="this.value=this.value.toUpperCase();_ls('set','ai_registration',this.value);_updateRegBadge();" />
         <span id="ai-reg-badge" class="ai-reg-badge none">—</span>
 
         <span style="font-size:11px;color:#8E8E93;">MEL auto-link</span>
+        </div>
       </div>
     </div>
 
