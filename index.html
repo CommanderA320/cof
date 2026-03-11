@@ -799,8 +799,36 @@ function _renderDocManager(){
     var uploadBtn = document.createElement('label');
     uploadBtn.htmlFor = 'fi-' + refCode;
     uploadBtn.className = 'doc-upload-btn';
-    uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
     uploadBtn.style.cursor = 'pointer';
+
+    // For built-in refs: show refresh icon, clicking fetches from GitHub
+    // For custom refs: show upload icon, clicking opens file picker
+    var isBuiltIn = REFERENCES.slice(0, 25).some(function(r){ return r.code === refCode; });
+    if(isBuiltIn) {
+      uploadBtn.textContent = hasDoc ? '🔄' : '⬇️';
+      uploadBtn.title = hasDoc ? 'Yenile' : 'Yukle';
+      uploadBtn.onclick = function(e){
+        e.preventDefault();
+        uploadBtn.textContent = '⏳';
+        uploadBtn.style.pointerEvents = 'none';
+        _loadDocFromGitHub(refCode, function(err, text){
+          if(err || !text || text.length < 100){
+            uploadBtn.textContent = '❌';
+            setTimeout(function(){ uploadBtn.textContent = hasDoc ? '🔄' : '⬇️'; uploadBtn.style.pointerEvents = ''; }, 2000);
+          } else {
+            // Force save to localStorage
+            try{ localStorage.setItem('doc_text_'+refCode, text); }catch(e2){}
+            try{ sessionStorage.setItem('doc_text_'+refCode, text); }catch(e3){}
+            _docExtractProgress[refCode] = '✅ ' + Math.round(text.length/1024) + ' KB — ☁️ GitHub';
+            _renderDocManager();
+          }
+        });
+      };
+      // Prevent file input from opening for built-in docs
+      uploadBtn.htmlFor = '';
+    } else {
+      uploadBtn.textContent = hasDoc ? '🔄' : '⬆️';
+    }
 
     // Drag & drop on the row
     row.addEventListener('dragover', function(e){
