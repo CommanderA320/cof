@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- COF v20260311-1245 -->
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -389,31 +393,11 @@ var _editPhIdx = -1;
 
 function _ls(action, key, val) {
   try {
-    if (action === 'get') {
-      var v = localStorage.getItem(key);
-      if(!v) v = sessionStorage.getItem(key); // fallback
-      return v;
-    }
-    if (action === 'set') {
-      localStorage.setItem(key, val);
-      try { sessionStorage.setItem(key, val); } catch(e2){}
-      return true;
-    }
-    if (action === 'rm') {
-      localStorage.removeItem(key);
-      try { sessionStorage.removeItem(key); } catch(e2){}
-      return true;
-    }
-  } catch(e) {
-    // localStorage blocked (private mode) — use sessionStorage only
-    try {
-      if (action === 'get') return sessionStorage.getItem(key);
-      if (action === 'set') { sessionStorage.setItem(key, val); return true; }
-      if (action === 'rm')  { sessionStorage.removeItem(key); return true; }
-    } catch(e2) { return null; }
-  }
+    if (action === 'get') return localStorage.getItem(key);
+    if (action === 'set') { localStorage.setItem(key, val); return true; }
+    if (action === 'rm')  { localStorage.removeItem(key); return true; }
+  } catch(e) { return null; }
 }
-
 function _loadData(cb) {
   // Set fallback from EMBEDDED_DATA
   DATA = EMBEDDED_DATA.map(function(x){return JSON.parse(JSON.stringify(x));});
