@@ -1121,6 +1121,8 @@ function _bm25Search(query, maxChunks, aircraftMSN){
 function _bm25MultiSearch(query, aircraftMSN) {
   // Extract distinct failure/system terms from query for targeted sub-searches
   var subQueries = [query]; // always include full query
+  // Always add OEB search — mandatory for every ECAM scenario
+  subQueries.push('OPERATIONS ENGINEERING BULLETINS OEB RED QRH');
 
   // Extract MEL items (e.g. 22-70-01B, 29-10-01A)
   var melMatches = query.match(/\b\d{2}-\d{2}-\d{2}[A-Z]?\b/g);
@@ -1134,6 +1136,8 @@ function _bm25MultiSearch(query, aircraftMSN) {
     {re:/MAYDAY|fuel.*emergency|minimum.*fuel/i, q:'MAYDAY fuel emergency commander declaration'},
     {re:/CAT.*III|LVO|low.*vis/i, q:'CAT III LVO low visibility approach minima'},
     {re:/CFIT|terrain|MSA|MVA/i, q:'CFIT terrain minimum safe altitude'},
+    {re:/BLEED|AIR ENG|bleed fault|pack fault/i, q:'OPERATIONS ENGINEERING BULLETINS bleed OEB RED'},
+    {re:/ECAM|fault|fail|inop/i, q:'OPERATIONS ENGINEERING BULLETINS OEB RED BLUE GREEN QRH'},
   ];
   failurePatterns.forEach(function(p){
     if(p.re.test(query)) subQueries.push(p.q);
@@ -2569,6 +2573,21 @@ function openAI() {
   checkKey();
   _renderHistory();
 
+  // Restore last report if available
+  try {
+    var lastRep = JSON.parse(_ls('get','ai_last_report')||'null');
+    if(lastRep && lastRep.result){
+      var bodyEl = document.getElementById('ai-result-body');
+      var timeEl = document.getElementById('ai-result-time');
+      var actEl  = document.getElementById('ai-result-actions');
+      var resultEl = document.getElementById('ai-result');
+      if(bodyEl) bodyEl.innerHTML = formatResult(lastRep.result);
+      if(timeEl) timeEl.textContent = lastRep.ts ? new Date(lastRep.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + 'Z — ' + (lastRep.reg||'') : '';
+      if(resultEl) resultEl.className = 'ai-result on';
+      if(actEl) actEl.style.display = 'flex';
+    }
+  } catch(e) {}
+
   // Restore saved registration
   var regEl = document.getElementById('ai-reg-input');
   if(regEl){
@@ -3153,6 +3172,16 @@ function sendQuery() {
       // Show PDF/Share buttons
       var actEl = document.getElementById("ai-result-actions");
       if(actEl){ actEl.style.display = "flex"; }
+      // Auto-save last report to localStorage
+      try {
+        var savedReport = {
+          ts: new Date().toISOString(),
+          reg: registration || '',
+          query: input,
+          result: streamedText
+        };
+        _ls('set', 'ai_last_report', JSON.stringify(savedReport));
+      } catch(e) {}
     }
 
     function _read(){
