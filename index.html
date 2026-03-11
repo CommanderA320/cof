@@ -389,10 +389,29 @@ var _editPhIdx = -1;
 
 function _ls(action, key, val) {
   try {
-    if (action === 'get') return localStorage.getItem(key);
-    if (action === 'set') { localStorage.setItem(key, val); return true; }
-    if (action === 'rm')  { localStorage.removeItem(key); return true; }
-  } catch(e) { return null; }
+    if (action === 'get') {
+      var v = localStorage.getItem(key);
+      if(!v) v = sessionStorage.getItem(key); // fallback
+      return v;
+    }
+    if (action === 'set') {
+      localStorage.setItem(key, val);
+      try { sessionStorage.setItem(key, val); } catch(e2){}
+      return true;
+    }
+    if (action === 'rm') {
+      localStorage.removeItem(key);
+      try { sessionStorage.removeItem(key); } catch(e2){}
+      return true;
+    }
+  } catch(e) {
+    // localStorage blocked (private mode) — use sessionStorage only
+    try {
+      if (action === 'get') return sessionStorage.getItem(key);
+      if (action === 'set') { sessionStorage.setItem(key, val); return true; }
+      if (action === 'rm')  { sessionStorage.removeItem(key); return true; }
+    } catch(e2) { return null; }
+  }
 }
 
 function _loadData(cb) {
@@ -2801,8 +2820,7 @@ function _renderHistory(){
   el.innerHTML = '<div class="ai-examples-title">LAST QUERIES</div>'
     + shown.map(function(q,i){
         return '<div class="example-chip" onclick="useHistory('+i+')"><div class="example-chip-txt" style="font-size:13px;">'+q.substring(0,90)+(q.length>90?'…':'')+'</div></div>';
-      }).join('')
-    + (extra > 0 ? '<div style="font-size:11px;color:#8E8E93;padding:4px 4px 0;">+ '+extra+' more</div>' : '');
+      }).join('');  + (extra > 0 ? '<div style="font-size:11px;color:#8E8E93;padding:4px 4px 0;">+ '+extra+' more</div>' : '');
 }
 
 function useHistory(idx){
