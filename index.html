@@ -648,7 +648,7 @@ function _loadDocFromGitHub(docCode, cb){
 function _getDocText(docCode){
   if(_docCache[docCode]) return _docCache[docCode];
   try{
-    var ls = localStorage.getItem('doc_text_'+docCode)||'';
+    var ls = localStorage.getItem('doc_text_'+docCode) || sessionStorage.getItem('doc_text_'+docCode) || '';
     if(ls.length > 100) _docCache[docCode] = ls; // warm memory cache
     return ls;
   }catch(e){ return ''; }
@@ -671,7 +671,7 @@ function _preloadDocs(onStatus, onDone){
     if(_docCache[code]){ next(); return; }
     // Check localStorage first — skip GitHub fetch if already cached
     try{
-      var cached = localStorage.getItem('doc_text_'+code)||'';
+      var cached = localStorage.getItem('doc_text_'+code) || sessionStorage.getItem('doc_text_'+code) || '';
       if(cached.length > 100){
         _docCache[code] = cached;
         onStatus && onStatus('✅ Önbellekten: '+code+' ('+i+'/'+codes.length+')');
@@ -950,7 +950,7 @@ function _extractPDF(file, docCode){
               var cap = 3000000;
               var txt = fullText.length > cap ? fullText.substring(0, cap) : fullText;
               try{
-                localStorage.setItem('doc_text_'+docCode, txt);
+                localStorage.setItem('doc_text_'+docCode, txt); try{sessionStorage.setItem('doc_text_'+docCode, txt);}catch(e2){}
                 _docExtractProgress[docCode] = '⚠️ GitHub hatası ('+saveErr.message+') — localStorage: '+Math.round(txt.length/1024)+'KB';
               }catch(le){
                 _docExtractProgress[docCode] = '❌ Kayıt başarısız: '+saveErr.message;
@@ -2571,6 +2571,15 @@ function checkKey(){
   }
 }
 
+function toggleContextBox() {
+  var body = document.getElementById('ai-context-body');
+  var chev = document.getElementById('ai-context-chevron');
+  if(!body) return;
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if(chev) chev.classList.toggle('open', !isOpen);
+}
+
 function openAI() {
   document.getElementById("ai-screen").className = "on";
   checkKey();
@@ -2589,8 +2598,10 @@ function openAI() {
     var titleEl = document.getElementById('ai-context-title');
     if(!tagsEl) return;
     if(statusMsg){
+      var loadedNow = REFERENCES.filter(function(r){ return _docAvailable(r.code); }).length;
+      var totalNow = REFERENCES.length;
       tagsEl.innerHTML = '<span class="ctx-tag ctx-loading" style="color:#E30613;">⏳ '+statusMsg+'</span>';
-      if(titleEl){ titleEl.textContent = 'Documents loading...'; titleEl.style.color='#E30613'; titleEl.classList.add('ctx-title-loading'); }
+      if(titleEl){ titleEl.textContent = 'Sources: '+loadedNow+'/'+totalNow+' loading...'; titleEl.style.color='#E30613'; titleEl.classList.add('ctx-title-loading'); }
       return;
     }
     var total = REFERENCES.length;
@@ -2602,15 +2613,6 @@ function openAI() {
       tags += '<span class="ctx-tag doc'+(ok?' loaded':'')+'" title="'+ref.code+'">'+ref.title+(ok?' ✓':'')+'</span>';
     });
     tagsEl.innerHTML = tags;
-  }
-
-  function toggleContextBox() {
-    var body = document.getElementById('ai-context-body');
-    var chev = document.getElementById('ai-context-chevron');
-    if(!body) return;
-    var isOpen = body.classList.contains('open');
-    body.classList.toggle('open', !isOpen);
-    if(chev) chev.classList.toggle('open', !isOpen);
   }
 
   _updateDocTags();
