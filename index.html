@@ -755,6 +755,11 @@ function _renderDocManager(){
       _renderDocManager();
     };
     row.style.position = 'relative';
+    // For built-in docs: hide delete button (cannot be deleted)
+    var isBuiltInDoc = REFERENCES.slice(0, 25).some(function(r){ return r.code === refCode; });
+    if(isBuiltInDoc) {
+      delBtn.style.display = 'none';
+    }
     row.appendChild(delBtn);
 
     // Swipe logic
