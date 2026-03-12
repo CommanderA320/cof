@@ -3268,10 +3268,26 @@ function sendQuery() {
             var after = dtxt.substring(sidx + _secNum.length, sidx + _secNum.length + 8).replace(/^\.?\s*/, '');
             // Real section header starts with capital letter, NOT "(" (amendment log)
             if(after.length > 0 && /^[A-Z]/.test(after)) {
-              // Cut at next section header (e.g. "8.2.1.4 Title") to show only this section
-            var raw = dtxt.substring(sidx, sidx + 20000);
-            var nextSecMatch = raw.match(/\n(\d+\.\d+(?:\.\d+)+\.?\s+[A-Z])/);
-            var chunk = nextSecMatch ? raw.substring(0, nextSecMatch.index) : raw;
+              // Cut at next sibling section header only
+            // Real section headers are on their own line: "8.2.1.4 Title" or "8.2.1.4. Title"
+            // Must start with same top-level number (e.g. 8.) and be a direct sibling/parent
+            var raw = dtxt.substring(sidx + 1, sidx + 20000);
+            // Build pattern for next section: same or shallower level
+            // e.g. for 8.2.1.3 → match 8.2.1.4, 8.2.2, 8.3, 9 etc at line start
+            var _parts = _secNum.split('.');
+            var _nextPatStr = '^' + _parts[0] + '\\.';
+            var _nextSecRe = new RegExp('\\n(' + _parts[0] + '\\.\\d+(?:\\.\\d+)*\\.?\\s+[A-Z])', 'g');
+            var _bestCut = -1;
+            var _m;
+            while((_m = _nextSecRe.exec(raw)) !== null) {
+              // Only cut if it's a different section (not a sub-reference mid-sentence)
+              var _mNum = _m[1].match(/^([\d.]+)/)[1].replace(/\.$/, '');
+              if(_mNum !== _secNum) {
+                _bestCut = _m.index;
+                break;
+              }
+            }
+            var chunk = _bestCut > -1 ? raw.substring(0, _bestCut) : raw;
             procResults.push({code: dc, text: chunk, score: 1000});
               break;
             }
