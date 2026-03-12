@@ -3235,18 +3235,24 @@ function sendQuery() {
 
     var procResults = [];
 
-    // Direct section number search: if query is "8.2.1.4" style, push high-score results first
-    var _sectionMatch = input.match(/^\s*(\d+\.\d+(?:\.\d+)*)\s*$/);
+    // Direct section number search: if query looks like "8.2.1.3" jump straight to it
+    var _sectionMatch = input.trim().match(/^(\d+\.\d+(?:\.\d+)*)$/);
     if(_sectionMatch) {
       var _secNum = _sectionMatch[1];
       procDocs.forEach(function(dc) {
         var dtxt = (_docCache && _docCache[dc]) || _getDocText(dc) || '';
         if(!dtxt) return;
-        var sidx = dtxt.indexOf(_secNum);
-        while(sidx > -1) {
-          var chunk = dtxt.substring(sidx, sidx + 3000);
+        // Search for section number - try variations (space, newline before it)
+        var searchVariants = [_secNum + ' ', _secNum + '\n', '\n' + _secNum];
+        var bestIdx = -1;
+        searchVariants.forEach(function(v){
+          var i = dtxt.indexOf(v);
+          if(i > -1 && (bestIdx === -1 || i < bestIdx)) bestIdx = i;
+        });
+        if(bestIdx === -1) bestIdx = dtxt.indexOf(_secNum); // fallback
+        if(bestIdx > -1) {
+          var chunk = dtxt.substring(bestIdx, bestIdx + 3000);
           procResults.push({code:dc, text:chunk, score:1000});
-          break;
         }
       });
     }
@@ -3349,6 +3355,10 @@ function sendQuery() {
     var resultEl = document.getElementById('ai-result');
     resultEl.className = 'ai-result on';
 
+    var sendBtn = document.getElementById('ai-send-btn');
+    var stopBtn = document.getElementById('ai-stop-btn');
+    if(sendBtn){ sendBtn.style.display=''; sendBtn.disabled=false; }
+    if(stopBtn){ stopBtn.style.display='none'; }
     if(topResults.length === 0) {
       resultEl.innerHTML = '<div style="padding:16px;color:#8E8E93;font-size:13px;">OM Part-A veya Part-B yüklü değil ya da ilgili bölüm bulunamadı.</div>';
     } else {
