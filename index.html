@@ -3076,7 +3076,7 @@ function shareReport() {
 
 function sendQuery() {
   // Ensure QRH is in _docCache before proceeding (needed for OEB check)
-  if(!_docCache['QRH'] && !localStorage.getItem('doc_text_QRH')) {
+  if(_aiMode !== 'procedure' && !_docCache['QRH'] && !localStorage.getItem('doc_text_QRH')) {
     var _sq_input = document.getElementById("ai-input").value.trim();
     if(_sq_input) {
       // Show loading indicator
@@ -3098,14 +3098,17 @@ function sendQuery() {
   if(registration) _ls('set','ai_registration', registration);
   _saveToHistory(input);
 
-  // Show loading
-  document.getElementById("ai-loading").className = "ai-loading on";
+  // Show loading (skip spinner for offline procedure mode)
+  if(_aiMode !== 'procedure') {
+    document.getElementById("ai-loading").className = "ai-loading on";
+  }
   document.getElementById("ai-result").className = "ai-result";
-  // Hide examples and history to give result more space
   var exEl=document.getElementById("ai-examples"); if(exEl) exEl.style.display="none";
   var hisEl=document.getElementById("ai-history"); if(hisEl) hisEl.style.display="none";
   document.getElementById("ai-send-btn").style.display = "none";
-  document.getElementById("ai-stop-btn").style.display = "flex";
+  if(_aiMode !== 'procedure') {
+    document.getElementById("ai-stop-btn").style.display = "flex";
+  }
   document.getElementById("ai-send-btn").disabled = true;
 
   // Loaded docs list
@@ -3128,9 +3131,12 @@ function sendQuery() {
     return;
   }
 
-  // BM25: pick most relevant chunks from loaded docs
+  // BM25: pick most relevant chunks from loaded docs (skip for offline procedure mode)
   var docContext = '';
   var melContext = '';
+  if(_aiMode === 'procedure') {
+    // Handled below in offline procedure branch — skip all API prep
+  }
   // Inject MSN into query so FCOM/AFM/FCTM chunks with that MSN get boosted
   // Try to get MSN — if not found, re-scan all docs (stale/partial cache)
   var msnData = _getMSNForReg(registration);
