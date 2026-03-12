@@ -3356,7 +3356,16 @@ function sendQuery() {
           var docColor = r.code === 'OM Part-A' ? '#007AFF' : '#5856D6';
           html += '<div style="margin-bottom:16px;border-left:3px solid '+docColor+';padding:10px 16px;background:#F9F9FB;">';
           html += '<div style="font-size:9px;font-weight:800;color:'+docColor+';letter-spacing:1px;margin-bottom:6px;">'+r.code+'</div>';
-          html += '<div style="font-size:12px;color:#1C1C1E;line-height:1.6;white-space:pre-wrap;font-family:monospace;">'+r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()+'</div>';
+          var cleanText = r.text
+            .replace(/E K \. 1 0 \. 7 3[^\n]*/g, '')
+            .replace(/QMS Document Template[^\n]*/g, '')
+            .replace(/Page: \d+[^\n]*/g, '')
+            .replace(/Copy of this document[^\n]*/g, '')
+            .replace(/Controlled and legally[^\n]*/g, '')
+            .replace(/=== Sayfa \d+ ===/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+          html += '<div style="font-size:12px;color:#1C1C1E;line-height:1.6;white-space:pre-wrap;font-family:monospace;">'+cleanText.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';
           html += '</div>';
         });
         html += '</div>';
