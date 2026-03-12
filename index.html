@@ -3303,6 +3303,16 @@ function sendQuery() {
           var pos = -1;
           while((pos = pl.indexOf(w, pos+1)) > -1) score += 1;
         });
+        // Big bonus if page contains a section header matching query words
+        // e.g. "8.2.1.4 Refuelling...Passengers" - title line match
+        var lines = pt.split('\n');
+        for(var li=0; li<Math.min(lines.length,5); li++){
+          var ll = lines[li].toLowerCase();
+          var titleHits = 0;
+          qWords.forEach(function(w){ if(ll.indexOf(w)>-1) titleHits++; });
+          if(titleHits >= 2) score += 20; // strong title match
+          else if(titleHits === 1) score += 5;
+        }
         if(score > 0) scored.push({code:code, text:pt.substring(0, 2000), score:score});
       });
 
