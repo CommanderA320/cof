@@ -3357,7 +3357,7 @@ function sendQuery() {
           html += '<div style="margin-bottom:16px;border-left:3px solid '+docColor+';padding:10px 16px;background:#F9F9FB;">';
           html += '<div style="font-size:9px;font-weight:800;color:'+docColor+';letter-spacing:1px;margin-bottom:6px;">'+r.code+'</div>';
           var cleanText = r.text
-            .replace(/E K \. 1 0 \. 7 3[^\n]*/g, '')
+            .replace(/E\s+K\s+\.\s+1\s+0[^\n]*/g, '')
             .replace(/QMS Document Template[^\n]*/g, '')
             .replace(/Page: \d+[^\n]*/g, '')
             .replace(/Copy of this document[^\n]*/g, '')
