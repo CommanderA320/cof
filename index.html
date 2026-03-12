@@ -3230,175 +3230,152 @@ function sendQuery() {
   var streamedText = '';
 
   // ===== OFFLINE PROCEDURE MODE =====
-  if(_aiMode === 'procedure') { try {
-    var procDocs = ['OM Part-A', 'OM Part-B'];
-
-    var procResults = [];
-
-    // Direct section number search: if query looks like "8.2.1.3" jump straight to it
-    // Normalize shorthand: "8213" → "8.2.1.3", "821" → "8.2.1"
-    var _rawInput = input.trim();
-    var _normalized = _rawInput;
-    if(/^\d{3,6}\.?$/.test(_rawInput)) {
-      var _digits = _rawInput.replace(/\.$/,'');
-      // Insert dots: first digit, then pairs: 8.2.1.3
-      if(_digits.length === 4) _normalized = _digits[0]+'.'+_digits[1]+'.'+_digits[2]+'.'+_digits[3];
-      else if(_digits.length === 3) _normalized = _digits[0]+'.'+_digits[1]+'.'+_digits[2];
-      else if(_digits.length === 5) _normalized = _digits[0]+'.'+_digits[1]+'.'+_digits[2]+'.'+_digits[3]+_digits[4];
-    }
-    var _sectionMatch = _normalized.match(/^(\d+\.\d+(?:\.\d+)*)\.?$/);
-    if(_sectionMatch) {
-      var _secNum = _sectionMatch[1];
-      procDocs.forEach(function(dc) {
-        var dtxt = (_docCache && _docCache[dc]) || _getDocText(dc) || '';
-        if(!dtxt) return;
-        // Find the REAL section header — after the number must be a capital letter title
-        // NOT "(A)" or "(B)" which are amendment log references
-        var sidx = dtxt.indexOf(_secNum);
-        while(sidx > -1) {
-          // Strip optional trailing dot and spaces: "8.2.1.3. Ref" or "8.2.1.3 Ref"
-          var after = dtxt.substring(sidx + _secNum.length, sidx + _secNum.length + 6).replace(/^\.?\s*/, '');
-          // Real header: starts with capital letter (title), NOT "(" (amendment ref like "(B)")
-          if(after.length > 0 && after[0] !== '(' && /[A-Z]/.test(after[0])) {
-            var chunk = dtxt.substring(sidx, sidx + 3000);
-            procResults.push({code:dc, text:chunk, score:1000});
-            break;
-          }
-          sidx = dtxt.indexOf(_secNum, sidx + 1);
-        }
-      });
-    }
-    // Translate Turkish aviation terms to English for document search
-    var TR_EN = {
-      'yakıt':'fuel','yakit':'fuel','alim':'refuel','alım':'refuel',
-      'yolcu':'passenger','uçakta':'aircraft','ucakta':'aircraft',
-      'prosedür':'procedure','prosedur':'procedure',
-      'iniş':'landing','inis':'landing','kalkış':'takeoff','kalkis':'takeoff',
-      'yaklaşma':'approach','yaklasma':'approach',
-      'motor':'engine','yangın':'fire','yangin':'fire',
-      'yakıt ikmali':'refueling','ikmal':'refueling',
-      'kaptan':'commander','pilot':'pilot',
-      'acil':'emergency','durum':'situation',
-      'hava':'weather','görüş':'visibility','gorus':'visibility',
-      'pist':'runway','park':'parking','taksi':'taxi',
-      'basınç':'pressure','basinc':'pressure',
-      'yük':'cargo','yuk':'cargo','tehlikeli':'dangerous',
-      'güvenlik':'security','guvenlik':'security',
-      'emniyet':'safety','kural':'rule','prosedur':'procedure',
-      'asgari':'minimum','azami':'maximum','limit':'limit',
-      'yer':'ground','hız':'speed','hiz':'speed',
-      'frekans':'frequency','iletişim':'communication','iletisim':'communication',
-      'rezerv':'reserve','depo':'tank','pompa':'pump',
-      'ile':'with','olan':'with','iken':'during','sonra':'after','önce':'before','once':'before',
-      'alım':'uptake','uçuş':'flight','ucus':'flight',
-      'kapı':'door','kapi':'door','çıkış':'exit','cikis':'exit',
-      'rota':'route','plan':'plan','brifinq':'briefing','brifing':'briefing',
-      'mürettebat':'crew','murettebat':'crew','kabin':'cabin',
-      'yük':'load','agirlik':'weight','ağırlık':'weight',
-      'denge':'balance','merkez':'center','gravity':'gravity',
-      'imza':'signature','belge':'document','form':'form',
-      'bildirim':'notification','rapor':'report','kayıt':'record','kayit':'record'
-    };
-    // Simple indexOf-based TR→EN translation (avoids regex issues with Turkish chars)
-    var translatedInput = input.toLowerCase();
-    Object.keys(TR_EN).forEach(function(tr){
-      var en = TR_EN[tr];
-      var pos = translatedInput.indexOf(tr);
-      while(pos > -1) {
-        translatedInput = translatedInput.substring(0, pos) + en + ' ' + translatedInput.substring(pos + tr.length);
-        pos = translatedInput.indexOf(tr, pos + en.length + 1);
-      }
-    });
-    // Now extract only ASCII words for matching against English docs
-    var qWords = [];
-    translatedInput.split(/\s+/).forEach(function(w){
-      var clean = w.replace(/[^a-zA-Z0-9]/g, '');
-      if(clean.length > 2) qWords.push(clean.toLowerCase());
-    });
-    qWords = qWords.filter(function(v,i,a){ return a.indexOf(v)===i; });
-
-    procDocs.forEach(function(code) {
-      var txt = (_docCache && _docCache[code]) || '';
-      if(!txt || txt.length < 100) {
-        try { txt = localStorage.getItem('doc_text_' + code) || ''; } catch(e){}
-      }
-      if(!txt || txt.length < 100) return;
-
-      // Split by page markers, filter cover/admin pages, score by keyword match
-      // Split by page markers
-      var rawPages = txt.split(/===\s*Sayfa\s*\d+\s*===/);
-      var scored = [];
-
-      rawPages.forEach(function(p) {
-        var pt = p.trim();
-        if(pt.length < 80) return;
-        var pl = pt.toLowerCase();
-        var score = 0;
-        qWords.forEach(function(w) {
-          var pos = -1;
-          while((pos = pl.indexOf(w, pos+1)) > -1) score += 1;
-        });
-        // Big bonus if page contains a section header matching query words
-        // e.g. "8.2.1.4 Refuelling...Passengers" - title line match
-        var lines = pt.split('\n');
-        for(var li=0; li<Math.min(lines.length,5); li++){
-          var ll = lines[li].toLowerCase();
-          var titleHits = 0;
-          qWords.forEach(function(w){ if(ll.indexOf(w)>-1) titleHits++; });
-          if(titleHits >= 2) score += 20; // strong title match
-          else if(titleHits === 1) score += 5;
-        }
-        if(score > 0) scored.push({code:code, text:pt.substring(0, 2000), score:score});
-      });
-
-      scored.sort(function(a,b){ return b.score - a.score; });
-      scored.slice(0, 4).forEach(function(s){ procResults.push(s); });
-    });
-
-    procResults.sort(function(a,b){ return b.score - a.score; });
-    var topResults = procResults.slice(0, 6);
-
-    // Render result
+  if(_aiMode === 'procedure') {
+    // Reset UI
     document.getElementById('ai-loading').className = 'ai-loading';
     document.getElementById('ai-send-btn').style.display = '';
-    document.getElementById('ai-stop-btn').style.display = 'none';
     document.getElementById('ai-send-btn').disabled = false;
-
+    document.getElementById('ai-stop-btn').style.display = 'none';
     var resultEl = document.getElementById('ai-result');
     resultEl.className = 'ai-result on';
 
-    var sendBtn = document.getElementById('ai-send-btn');
-    var stopBtn = document.getElementById('ai-stop-btn');
-    if(sendBtn){ sendBtn.style.display=''; sendBtn.disabled=false; }
-    if(stopBtn){ stopBtn.style.display='none'; }
-    if(topResults.length === 0) {
-      resultEl.innerHTML = '<div style="padding:16px;color:#8E8E93;font-size:13px;">OM Part-A veya Part-B yüklü değil ya da ilgili bölüm bulunamadı.</div>';
-    } else {
-      var html = '<div style="padding:12px 0;">';
-      html += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:1px;margin-bottom:12px;padding:0 16px;">📄 PROCEDURE — OM PART-A / PART-B</div>';
-      topResults.forEach(function(r, i) {
-        var docLabel = r.code === 'OM Part-A' ? 'OM Part-A' : 'OM Part-B';
-        var docColor = r.code === 'OM Part-A' ? '#007AFF' : '#5856D6';
-        html += '<div style="margin-bottom:16px;border-left:3px solid '+docColor+';padding:10px 16px;background:#F9F9FB;">';
-        html += '<div style="font-size:9px;font-weight:800;color:'+docColor+';letter-spacing:1px;margin-bottom:6px;">'+docLabel+'</div>';
-        html += '<div style="font-size:12px;color:#1C1C1E;line-height:1.6;white-space:pre-wrap;font-family:monospace;">'+r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()+'</div>';
+    try {
+      var procDocs = ['OM Part-A', 'OM Part-B'];
+      var procResults = [];
+
+      // --- STEP 1: Normalize input ---
+      // Support shorthand: "8213" → "8.2.1.3"
+      var _rawInput = input.trim();
+      var _normalized = _rawInput.replace(/\.$/,''); // strip trailing dot temporarily
+      if(/^\d{3,6}$/.test(_normalized)) {
+        var d = _normalized;
+        if(d.length === 3) _normalized = d[0]+'.'+d[1]+'.'+d[2];
+        else if(d.length === 4) _normalized = d[0]+'.'+d[1]+'.'+d[2]+'.'+d[3];
+        else if(d.length === 5) _normalized = d[0]+'.'+d[1]+'.'+d[2]+'.'+d[3]+d[4];
+        else if(d.length === 6) _normalized = d[0]+'.'+d[1]+'.'+d[2]+'.'+d[3]+d[4]+'.'+d[5];
+      }
+
+      // --- STEP 2: Direct section lookup ---
+      var _secMatch = _normalized.match(/^(\d+\.\d+(?:\.\d+)*)$/);
+      if(_secMatch) {
+        var _secNum = _secMatch[1];
+        procDocs.forEach(function(dc) {
+          var dtxt = (_docCache && _docCache[dc]) ? _docCache[dc] : _getDocText(dc);
+          if(!dtxt || dtxt.length < 100) return;
+          var sidx = dtxt.indexOf(_secNum);
+          while(sidx > -1) {
+            // After section number, strip optional trailing dot and spaces
+            var after = dtxt.substring(sidx + _secNum.length, sidx + _secNum.length + 8).replace(/^\.?\s*/, '');
+            // Real section header starts with capital letter, NOT "(" (amendment log)
+            if(after.length > 0 && /^[A-Z]/.test(after)) {
+              var chunk = dtxt.substring(sidx, sidx + 3000);
+              procResults.push({code: dc, text: chunk, score: 1000});
+              break;
+            }
+            sidx = dtxt.indexOf(_secNum, sidx + 1);
+          }
+        });
+      }
+
+      // --- STEP 3: Keyword search (if no direct hit or keyword query) ---
+      if(procResults.length === 0) {
+        var TR_EN = {
+          'yakıt':'fuel','yakit':'fuel','alım':'refuel','alim':'refuel',
+          'yolcu':'passenger','uçakta':'aircraft','ucakta':'aircraft',
+          'prosedür':'procedure','prosedur':'procedure',
+          'iniş':'landing','inis':'landing','kalkış':'takeoff','kalkis':'takeoff',
+          'yaklaşma':'approach','yaklasma':'approach',
+          'motor':'engine','yangın':'fire','yangin':'fire',
+          'yakıt ikmali':'refueling','ikmal':'refueling',
+          'kaptan':'commander','acil':'emergency',
+          'hava':'weather','görüş':'visibility','gorus':'visibility',
+          'pist':'runway','hız':'speed','hiz':'speed',
+          'emniyet':'safety','güvenlik':'security','guvenlik':'security',
+          'mürettebat':'crew','murettebat':'crew','kabin':'cabin',
+          'ağırlık':'weight','agirlik':'weight','denge':'balance',
+          'iken':'during','sonra':'after','önce':'before','once':'before',
+          'uçuş':'flight','ucus':'flight','kalkış':'departure'
+        };
+        var translated = _rawInput.toLowerCase();
+        Object.keys(TR_EN).forEach(function(tr) {
+          var en = TR_EN[tr];
+          var pos = translated.indexOf(tr);
+          while(pos > -1) {
+            translated = translated.substring(0, pos) + en + ' ' + translated.substring(pos + tr.length);
+            pos = translated.indexOf(tr, pos + en.length + 1);
+          }
+        });
+        var qWords = [];
+        translated.split(/\s+/).forEach(function(w) {
+          var clean = w.replace(/[^a-zA-Z0-9]/g, '');
+          if(clean.length > 2) qWords.push(clean.toLowerCase());
+        });
+        qWords = qWords.filter(function(v,i,a){ return a.indexOf(v)===i; });
+
+        procDocs.forEach(function(code) {
+          var txt = (_docCache && _docCache[code]) ? _docCache[code] : _getDocText(code);
+          if(!txt || txt.length < 100) return;
+
+          var pages = txt.split(/===\s*Sayfa\s*\d+\s*===/);
+          var scored = [];
+          pages.forEach(function(p) {
+            var pt = p.trim();
+            if(pt.length < 80) return;
+            // Skip cover/admin pages
+            if(pt.indexOf('APPROVAL_TYPE') > -1) return;
+            if(pt.indexOf('Cover Page') > -1) return;
+            if(pt.indexOf('ddms.thy.com') > -1) return;
+            var pl = pt.toLowerCase();
+            var score = 0;
+            qWords.forEach(function(w) {
+              var pos = -1;
+              while((pos = pl.indexOf(w, pos+1)) > -1) score += 1;
+            });
+            // Title bonus: first 3 lines contain 2+ keywords
+            var firstLines = pt.split('\n').slice(0,3).join(' ').toLowerCase();
+            var titleHits = 0;
+            qWords.forEach(function(w){ if(firstLines.indexOf(w) > -1) titleHits++; });
+            if(titleHits >= 2) score += 15;
+            if(score > 0) scored.push({code: code, text: pt.substring(0, 2000), score: score});
+          });
+          scored.sort(function(a,b){ return b.score - a.score; });
+          scored.slice(0, 4).forEach(function(s){ procResults.push(s); });
+        });
+      }
+
+      // --- STEP 4: Render ---
+      procResults.sort(function(a,b){ return b.score - a.score; });
+      var topResults = procResults.slice(0, 6);
+
+      if(topResults.length === 0) {
+        resultEl.innerHTML = '<div style="padding:16px;color:#8E8E93;font-size:13px;">OM Part-A veya Part-B yüklü değil ya da ilgili bölüm bulunamadı.</div>';
+      } else {
+        var html = '<div style="padding:12px 0;">';
+        html += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:1px;margin-bottom:12px;padding:0 16px;">📄 PROCEDURE — OM PART-A / PART-B</div>';
+        topResults.forEach(function(r) {
+          var docColor = r.code === 'OM Part-A' ? '#007AFF' : '#5856D6';
+          html += '<div style="margin-bottom:16px;border-left:3px solid '+docColor+';padding:10px 16px;background:#F9F9FB;">';
+          html += '<div style="font-size:9px;font-weight:800;color:'+docColor+';letter-spacing:1px;margin-bottom:6px;">'+r.code+'</div>';
+          html += '<div style="font-size:12px;color:#1C1C1E;line-height:1.6;white-space:pre-wrap;font-family:monospace;">'+r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()+'</div>';
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
-      resultEl.innerHTML = html;
+        resultEl.innerHTML = html;
+      }
+
+      // Save last report
+      try {
+        var rText = topResults.map(function(r){ return '['+r.code+']\n'+r.text.trim(); }).join('\n\n---\n\n');
+        localStorage.setItem('ai_last_report', JSON.stringify({ts: new Date().toISOString(), reg: registration, query: input, result: rText}));
+      } catch(e) {}
+
+    } catch(procErr) {
+      console.error('PROC ERROR:', procErr);
+      resultEl.innerHTML = '<div style="padding:16px;color:red;font-size:12px;">PROC ERROR: '+procErr.message+'</div>';
     }
 
-    // Save to history/last report
-    var reportText = topResults.map(function(r){ return '['+r.code+']\n'+r.text.trim(); }).join('\n\n---\n\n');
-    try{ localStorage.setItem('ai_last_report', JSON.stringify({ts:t, reg:registration, query:input, result:reportText})); }catch(e){}
-
     return; // Skip API call
-  } catch(procErr) {
-    console.error('PROC ERROR:', procErr);
-    var _re = document.getElementById('ai-result');
-    if(_re) { _re.className='ai-result on'; _re.innerHTML='<div style="padding:16px;color:red;font-size:12px;">PROC ERROR: '+procErr.message+'</div>'; }
-    return;
-  }}
+  }
   // ===== END OFFLINE PROCEDURE MODE =====
 
   // Final guard — never send empty content
