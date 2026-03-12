@@ -3253,7 +3253,7 @@ function sendQuery() {
       });
       scored.sort(function(a,b){ return b.score - a.score; });
       // Top 4 chunks per doc
-      scored.slice(0, 4).forEach(function(s){ if(s.score > 0) procResults.push(s); });
+      scored.slice(0, 4).forEach(function(s){ procResults.push(s); });
     });
 
     // Sort all results by score, take top 6
