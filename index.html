@@ -3268,8 +3268,11 @@ function sendQuery() {
             var after = dtxt.substring(sidx + _secNum.length, sidx + _secNum.length + 8).replace(/^\.?\s*/, '');
             // Real section header starts with capital letter, NOT "(" (amendment log)
             if(after.length > 0 && /^[A-Z]/.test(after)) {
-              var chunk = dtxt.substring(sidx, sidx + 20000);
-              procResults.push({code: dc, text: chunk, score: 1000});
+              // Cut at next section header (e.g. "8.2.1.4 Title") to show only this section
+            var raw = dtxt.substring(sidx, sidx + 20000);
+            var nextSecMatch = raw.match(/\n(\d+\.\d+(?:\.\d+)+\.?\s+[A-Z])/);
+            var chunk = nextSecMatch ? raw.substring(0, nextSecMatch.index) : raw;
+            procResults.push({code: dc, text: chunk, score: 1000});
               break;
             }
             sidx = dtxt.indexOf(_secNum, sidx + 1);
