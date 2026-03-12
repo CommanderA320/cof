@@ -3233,7 +3233,44 @@ function sendQuery() {
   if(_aiMode === 'procedure') {
     var procDocs = ['OM Part-A', 'OM Part-B'];
     var procResults = [];
-    var qWords = input.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(function(w){ return w.length > 2; });
+    // Translate Turkish aviation terms to English for document search
+    var TR_EN = {
+      'yakıt':'fuel','yakit':'fuel','alim':'refuel','alım':'refuel',
+      'yolcu':'passenger','uçakta':'aircraft','ucakta':'aircraft',
+      'prosedür':'procedure','prosedur':'procedure',
+      'iniş':'landing','inis':'landing','kalkış':'takeoff','kalkis':'takeoff',
+      'yaklaşma':'approach','yaklasma':'approach',
+      'motor':'engine','yangın':'fire','yangin':'fire',
+      'yakıt ikmali':'refueling','ikmal':'refueling',
+      'kaptan':'commander','pilot':'pilot',
+      'acil':'emergency','durum':'situation',
+      'hava':'weather','görüş':'visibility','gorus':'visibility',
+      'pist':'runway','park':'parking','taksi':'taxi',
+      'basınç':'pressure','basinc':'pressure',
+      'yük':'cargo','yuk':'cargo','tehlikeli':'dangerous',
+      'güvenlik':'security','guvenlik':'security',
+      'emniyet':'safety','kural':'rule','prosedur':'procedure',
+      'asgari':'minimum','azami':'maximum','limit':'limit',
+      'yer':'ground','hız':'speed','hiz':'speed',
+      'frekans':'frequency','iletişim':'communication','iletisim':'communication',
+      'rezerv':'reserve','depo':'tank','pompa':'pump',
+      'ile':'with','olan':'with','iken':'during','sonra':'after','önce':'before','once':'before',
+      'alım':'uptake','uçuş':'flight','ucus':'flight',
+      'kapı':'door','kapi':'door','çıkış':'exit','cikis':'exit',
+      'rota':'route','plan':'plan','brifinq':'briefing','brifing':'briefing',
+      'mürettebat':'crew','murettebat':'crew','kabin':'cabin',
+      'yük':'load','agirlik':'weight','ağırlık':'weight',
+      'denge':'balance','merkez':'center','gravity':'gravity',
+      'imza':'signature','belge':'document','form':'form',
+      'bildirim':'notification','rapor':'report','kayıt':'record','kayit':'record'
+    };
+    var translatedInput = input.toLowerCase();
+    Object.keys(TR_EN).forEach(function(tr){ 
+      translatedInput = translatedInput.replace(new RegExp(tr, 'gi'), TR_EN[tr]+' '+tr); 
+    });
+    var qWords = translatedInput.replace(/[^a-z0-9\s]/gi,' ').split(/\s+/).filter(function(w){ return w.length > 2; });
+    // Deduplicate
+    qWords = qWords.filter(function(v,i,a){ return a.indexOf(v)===i; });
 
     procDocs.forEach(function(code) {
       var txt = (_docCache && _docCache[code]) || '';
@@ -3242,20 +3279,26 @@ function sendQuery() {
       }
       if(!txt || txt.length < 100) return;
 
-      // Split into ~500-char paragraphs
-      var paras = txt.split(/\n{2,}/);
+      // Split by page markers, filter cover/admin pages, score by keyword match
+      var SKIP_PATTERNS = /APPROVAL_TYPE|Cover Page|RECORD OF REVISIONS|CURRENT AMENDMENT|QMS Document Template|Copy of this document|ddms\.thy\.com|REVISION DATE|ENTRY INTO FORCE|Controlled and legally valid/i;
+      var paras = txt.split(/===\s*Sayfa\s*\d+\s*===/);
       var scored = [];
       paras.forEach(function(p) {
-        if(p.trim().length < 20) return;
-        var pl = p.toLowerCase();
+        var pt = p.trim();
+        if(pt.length < 50) return;
+        if(SKIP_PATTERNS.test(pt)) return; // skip cover/admin pages
+        var pl = pt.toLowerCase();
         var score = 0;
-        qWords.forEach(function(w){ 
-          var re = new RegExp(w, 'g');
+        qWords.forEach(function(w){
+          var re = new RegExp(w, 'gi');
           var matches = pl.match(re);
-          if(matches) score += matches.length;
+          if(matches) score += matches.length * 2;
+          // Partial match bonus
+          if(pl.indexOf(w.substring(0, Math.max(3, w.length-2))) > -1) score += 1;
         });
-        if(score > 0) scored.push({code:code, text:p.trim(), score:score});
+        if(score > 0) scored.push({code:code, text:pt.substring(0, 1500), score:score});
       });
+      // Also split by double newlines within high-scoring pages
       scored.sort(function(a,b){ return b.score - a.score; });
       scored.slice(0, 4).forEach(function(s){ procResults.push(s); });
     });
