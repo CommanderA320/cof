@@ -3232,6 +3232,48 @@ function sendQuery() {
   // ===== OFFLINE PROCEDURE MODE =====
   if(_aiMode === 'procedure') {
     var procDocs = ['OM Part-A', 'OM Part-B'];
+
+    // Direct section number search: if query contains "8.2.1.4" style, jump straight to it
+    var _sectionMatch = input.match(/\b(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)\b/);
+    if(_sectionMatch) {
+      var _secNum = _sectionMatch[1];
+      var _directHits = false;
+      procDocs.forEach(function(dc) {
+        var dtxt = (_docCache && _docCache[dc]) || _getDocText(dc) || '';
+        if(!dtxt) return;
+        // Find the section in the full text
+        var sidx = dtxt.indexOf(_secNum);
+        while(sidx > -1) {
+          // Check it's a real section header (preceded by newline or start)
+          var before = dtxt.substring(Math.max(0,sidx-2), sidx);
+          if(!before.trim() || before === '  ') {
+            var chunk = dtxt.substring(sidx, sidx + 2500);
+            procResults.push({code:dc, text:chunk, score:1000});
+            _directHits = true;
+            break;
+          }
+          sidx = dtxt.indexOf(_secNum, sidx+1);
+        }
+      });
+      if(_directHits) {
+        // Still show results but skip scoring phase
+        procResults.sort(function(a,b){ return b.score-a.score; });
+        // display directly
+        var _html = '';
+        procResults.slice(0,4).forEach(function(r){
+          var color = r.code==='OM Part-A' ? '#3b82f6' : '#8b5cf6';
+          _html += '<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:600;color:'+color+';margin-bottom:4px">'+r.code+'</div>';
+          _html += '<pre style="white-space:pre-wrap;font-size:11px;line-height:1.5;color:#e2e8f0;font-family:monospace">'+r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></div>';
+        });
+        var _container = document.getElementById('aiResult');
+        if(_container) {
+          _container.innerHTML = _html || '<p style="color:#94a3b8">Bölüm bulunamadı.</p>';
+        }
+        document.getElementById('aiLoading') && (document.getElementById('aiLoading').style.display='none');
+        document.getElementById('aiResult') && (document.getElementById('aiResult').style.display='block');
+        return;
+      }
+    }
     var procResults = [];
     // Translate Turkish aviation terms to English for document search
     var TR_EN = {
