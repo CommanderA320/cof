@@ -3264,12 +3264,22 @@ function sendQuery() {
       'imza':'signature','belge':'document','form':'form',
       'bildirim':'notification','rapor':'report','kayıt':'record','kayit':'record'
     };
+    // Simple indexOf-based TR→EN translation (avoids regex issues with Turkish chars)
     var translatedInput = input.toLowerCase();
-    Object.keys(TR_EN).forEach(function(tr){ 
-      translatedInput = translatedInput.replace(new RegExp(tr, 'gi'), TR_EN[tr]+' '+tr); 
+    Object.keys(TR_EN).forEach(function(tr){
+      var en = TR_EN[tr];
+      var pos = translatedInput.indexOf(tr);
+      while(pos > -1) {
+        translatedInput = translatedInput.substring(0, pos) + en + ' ' + translatedInput.substring(pos + tr.length);
+        pos = translatedInput.indexOf(tr, pos + en.length + 1);
+      }
     });
-    var qWords = translatedInput.replace(/[^a-z0-9\s]/gi,' ').split(/\s+/).filter(function(w){ return w.length > 2; });
-    // Deduplicate
+    // Now extract only ASCII words for matching against English docs
+    var qWords = [];
+    translatedInput.split(/\s+/).forEach(function(w){
+      var clean = w.replace(/[^a-zA-Z0-9]/g, '');
+      if(clean.length > 2) qWords.push(clean.toLowerCase());
+    });
     qWords = qWords.filter(function(v,i,a){ return a.indexOf(v)===i; });
 
     procDocs.forEach(function(code) {
