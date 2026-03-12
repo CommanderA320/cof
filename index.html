@@ -3226,7 +3226,7 @@ function sendQuery() {
   // ===== OFFLINE PROCEDURE MODE =====
   // If PROCEDURE mode: search only OM Part-A + Part-B, return raw text, no API
   if(_aiMode === 'procedure') {
-    var procDocs = ['OM_Part-A', 'OM_Part-B'];
+    var procDocs = ['OM Part-A', 'OM Part-B'];
     var procResults = [];
     procDocs.forEach(function(code) {
       var txt = (_docCache && _docCache[code]) || _getDocText(code) || '';
@@ -3269,8 +3269,8 @@ function sendQuery() {
       var html = '<div style="padding:12px 0;">';
       html += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:1px;margin-bottom:12px;padding:0 16px;">📄 PROCEDURE — OM PART-A / PART-B</div>';
       topResults.forEach(function(r, i) {
-        var docLabel = r.code === 'OM_Part-A' ? 'OM Part-A' : 'OM Part-B';
-        var docColor = r.code === 'OM_Part-A' ? '#007AFF' : '#5856D6';
+        var docLabel = r.code === 'OM Part-A' ? 'OM Part-A' : 'OM Part-B';
+        var docColor = r.code === 'OM Part-A' ? '#007AFF' : '#5856D6';
         html += '<div style="margin-bottom:16px;border-left:3px solid '+docColor+';padding:10px 16px;background:#F9F9FB;">';
         html += '<div style="font-size:9px;font-weight:800;color:'+docColor+';letter-spacing:1px;margin-bottom:6px;">'+docLabel+'</div>';
         html += '<div style="font-size:12px;color:#1C1C1E;line-height:1.6;white-space:pre-wrap;font-family:monospace;">'+r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()+'</div>';
