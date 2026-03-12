@@ -3268,15 +3268,25 @@ function sendQuery() {
             var after = dtxt.substring(sidx + _secNum.length, sidx + _secNum.length + 8).replace(/^\.?\s*/, '');
             // Real section header starts with capital letter, NOT "(" (amendment log)
             if(after.length > 0 && /^[A-Z]/.test(after)) {
-              // Cut exactly at next sibling section header
+              // Cut at next sibling section header
             var raw = dtxt.substring(sidx, sidx + 20000);
             var _parts = _secNum.split('.');
             var _cutIdx = raw.length;
-            // Try next section at same level: 8.2.1.3 → 8.2.1.4
             var _nextSec = _parts.slice(0, _parts.length-1).join('.') + '.' + (parseInt(_parts[_parts.length-1])+1);
-            var _ni = raw.indexOf('\n' + _nextSec + ' ', 1);
-            if(_ni === -1) _ni = raw.indexOf('\n' + _nextSec + '.', 1);
-            if(_ni > 0) _cutIdx = _ni;
+            // Search for next section — must NOT be preceded by a digit or dot (avoid "Chapter 8.2.1.4")
+            var _searchFrom = 1;
+            while(_searchFrom < raw.length) {
+              var _ni = raw.indexOf(_nextSec, _searchFrom);
+              if(_ni === -1) break;
+              var _prevChar = raw[_ni - 1] || '';
+              var _nextChar = raw[_ni + _nextSec.length] || '';
+              // Valid header: prev is newline/space, next is space/dot/newline
+              if(!/[\d.]/.test(_prevChar) && /[\s.]/.test(_nextChar)) {
+                _cutIdx = _ni;
+                break;
+              }
+              _searchFrom = _ni + 1;
+            }
             var chunk = raw.substring(0, _cutIdx);
             procResults.push({code: dc, text: chunk, score: 1000});
               break;
