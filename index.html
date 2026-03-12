@@ -3287,35 +3287,11 @@ function sendQuery() {
       rawPages.forEach(function(p) {
         var pt = p.trim();
         if(pt.length < 80) return;
-
-        // Skip cover/approval pages
-        if(pt.indexOf('APPROVAL_TYPE') > -1) return;
-        if(pt.indexOf('Cover Page') > -1) return;
-        if(pt.indexOf('ddms.thy.com') > -1) return;
-        if(pt.indexOf('Controlled and legally valid') > -1) return;
-
-        // Skip amendment list pages: count "revised." "added." "removed." occurrences
-        var amendCount = 0;
-        var tmp = pt.toLowerCase();
-        var rIdx = -1;
-        while((rIdx = tmp.indexOf('revised.', rIdx+1)) > -1) amendCount++;
-        while((rIdx = tmp.indexOf(' revised\n', rIdx+1)) > -1) amendCount++;
-        if(amendCount > 6) return;
-
-        // Strip footer boilerplate
-        var ptLines = pt.split('\n').filter(function(l){
-          return l.indexOf('QMS Document Template') < 0 &&
-                 l.indexOf('Page: ') < 0 &&
-                 l.indexOf('Copy of this document') < 0;
-        });
-        pt = ptLines.join('\n').trim();
-
         var pl = pt.toLowerCase();
         var score = 0;
         qWords.forEach(function(w) {
           var pos = -1;
-          var wl = w.toLowerCase();
-          while((pos = pl.indexOf(wl, pos+1)) > -1) score += 3;
+          while((pos = pl.indexOf(w, pos+1)) > -1) score += 1;
         });
         if(score > 0) scored.push({code:code, text:pt.substring(0, 2000), score:score});
       });
