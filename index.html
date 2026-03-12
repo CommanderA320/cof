@@ -3230,33 +3230,36 @@ function sendQuery() {
   var streamedText = '';
 
   // ===== OFFLINE PROCEDURE MODE =====
-  // If PROCEDURE mode: search only OM Part-A + Part-B, return raw text, no API
   if(_aiMode === 'procedure') {
     var procDocs = ['OM Part-A', 'OM Part-B'];
     var procResults = [];
+    var qWords = input.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(function(w){ return w.length > 2; });
+
     procDocs.forEach(function(code) {
-      var txt = (_docCache && _docCache[code]) || _getDocText(code) || '';
-      if(txt.length < 100) return;
-      // Chunk and BM25 score
-      var chunks = _chunkDoc(code, code, txt);
-      var qTokens = _tokenize(input);
-      // Score each chunk
-      var scored = chunks.map(function(ch) {
+      var txt = (_docCache && _docCache[code]) || '';
+      if(!txt || txt.length < 100) {
+        try { txt = localStorage.getItem('doc_text_' + code) || ''; } catch(e){}
+      }
+      if(!txt || txt.length < 100) return;
+
+      // Split into ~500-char paragraphs
+      var paras = txt.split(/\n{2,}/);
+      var scored = [];
+      paras.forEach(function(p) {
+        if(p.trim().length < 20) return;
+        var pl = p.toLowerCase();
         var score = 0;
-        var cTokens = _tokenize(ch.text);
-        var tf = {};
-        cTokens.forEach(function(t){ tf[t] = (tf[t]||0)+1; });
-        qTokens.forEach(function(qt){
-          if(tf[qt]) score += (tf[qt]/(cTokens.length+1)) * Math.log(1 + chunks.length/(1+1));
+        qWords.forEach(function(w){ 
+          var re = new RegExp(w, 'g');
+          var matches = pl.match(re);
+          if(matches) score += matches.length;
         });
-        return {code:code, text:ch.text, score:score};
+        if(score > 0) scored.push({code:code, text:p.trim(), score:score});
       });
       scored.sort(function(a,b){ return b.score - a.score; });
-      // Top 4 chunks per doc
       scored.slice(0, 4).forEach(function(s){ procResults.push(s); });
     });
 
-    // Sort all results by score, take top 6
     procResults.sort(function(a,b){ return b.score - a.score; });
     var topResults = procResults.slice(0, 6);
 
