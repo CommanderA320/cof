@@ -3268,7 +3268,7 @@ function sendQuery() {
             var after = dtxt.substring(sidx + _secNum.length, sidx + _secNum.length + 8).replace(/^\.?\s*/, '');
             // Real section header starts with capital letter, NOT "(" (amendment log)
             if(after.length > 0 && /^[A-Z]/.test(after)) {
-              var chunk = dtxt.substring(sidx, sidx + 8000);
+              var chunk = dtxt.substring(sidx, sidx + 20000);
               procResults.push({code: dc, text: chunk, score: 1000});
               break;
             }
