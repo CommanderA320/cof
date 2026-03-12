@@ -3286,30 +3286,36 @@ function sendQuery() {
 
       rawPages.forEach(function(p) {
         var pt = p.trim();
-        if(pt.length < 100) return;
+        if(pt.length < 80) return;
 
-        // Skip cover/admin pages
-        if(/APPROVAL_TYPE|Cover Page|RECORD OF REVISIONS|ddms.thy.com|Controlled and legally valid/.test(pt)) return;
+        // Skip cover/approval pages
+        if(pt.indexOf('APPROVAL_TYPE') > -1) return;
+        if(pt.indexOf('Cover Page') > -1) return;
+        if(pt.indexOf('ddms.thy.com') > -1) return;
+        if(pt.indexOf('Controlled and legally valid') > -1) return;
 
-        // Detect amendment log pages by average line length
-        // Real content pages: long lines (>60 chars avg)
-        // Amendment pages: short lines ("8.2.1.3 (B)   Content revised.")
-        var lines = pt.split('\n').filter(function(l){ return l.trim().length > 5; });
-        var avgLen = lines.reduce(function(s,l){ return s+l.length; }, 0) / (lines.length || 1);
-        if(avgLen < 55 && lines.length > 5) return;
+        // Skip amendment list pages: count "revised." "added." "removed." occurrences
+        var amendCount = 0;
+        var tmp = pt.toLowerCase();
+        var rIdx = -1;
+        while((rIdx = tmp.indexOf('revised.', rIdx+1)) > -1) amendCount++;
+        while((rIdx = tmp.indexOf(' revised\n', rIdx+1)) > -1) amendCount++;
+        if(amendCount > 6) return;
 
         // Strip footer boilerplate
-        pt = pt.replace(/QMS Document Template[^\n]*/g, '')
-               .replace(/Page: \d+ \| Total Page[^\n]*/g, '')
-               .replace(/Copy of this document[^\n]*/g, '')
-               .trim();
+        var ptLines = pt.split('\n').filter(function(l){
+          return l.indexOf('QMS Document Template') < 0 &&
+                 l.indexOf('Page: ') < 0 &&
+                 l.indexOf('Copy of this document') < 0;
+        });
+        pt = ptLines.join('\n').trim();
 
         var pl = pt.toLowerCase();
         var score = 0;
         qWords.forEach(function(w) {
-          var re = new RegExp(w, 'gi');
-          var m = pl.match(re);
-          if(m) score += m.length * 3;
+          var pos = -1;
+          var wl = w.toLowerCase();
+          while((pos = pl.indexOf(wl, pos+1)) > -1) score += 3;
         });
         if(score > 0) scored.push({code:code, text:pt.substring(0, 2000), score:score});
       });
