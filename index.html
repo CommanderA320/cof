@@ -3121,7 +3121,7 @@ function sendQuery() {
 
   var t = utcNow();
   var apiKey = _ls('get','thy_api_key')||'';
-  if(!apiKey){
+  if(!apiKey && _aiMode !== 'procedure'){
     checkKey();
     document.getElementById('ai-loading').className='ai-loading';
     document.getElementById('ai-send-btn').disabled=false;
@@ -3222,6 +3222,71 @@ function sendQuery() {
   document.getElementById("ai-result").className = "ai-result on";
 
   var streamedText = '';
+
+  // ===== OFFLINE PROCEDURE MODE =====
+  // If PROCEDURE mode: search only OM Part-A + Part-B, return raw text, no API
+  if(_aiMode === 'procedure') {
+    var procDocs = ['OM_Part-A', 'OM_Part-B'];
+    var procResults = [];
+    procDocs.forEach(function(code) {
+      var txt = (_docCache && _docCache[code]) || _getDocText(code) || '';
+      if(txt.length < 100) return;
+      // Chunk and BM25 score
+      var chunks = _chunkDoc(code, code, txt);
+      var qTokens = _tokenize(input);
+      // Score each chunk
+      var scored = chunks.map(function(ch) {
+        var score = 0;
+        var cTokens = _tokenize(ch.text);
+        var tf = {};
+        cTokens.forEach(function(t){ tf[t] = (tf[t]||0)+1; });
+        qTokens.forEach(function(qt){
+          if(tf[qt]) score += (tf[qt]/(cTokens.length+1)) * Math.log(1 + chunks.length/(1+1));
+        });
+        return {code:code, text:ch.text, score:score};
+      });
+      scored.sort(function(a,b){ return b.score - a.score; });
+      // Top 4 chunks per doc
+      scored.slice(0, 4).forEach(function(s){ if(s.score > 0) procResults.push(s); });
+    });
+
+    // Sort all results by score, take top 6
+    procResults.sort(function(a,b){ return b.score - a.score; });
+    var topResults = procResults.slice(0, 6);
+
+    // Render result
+    document.getElementById('ai-loading').className = 'ai-loading';
+    document.getElementById('ai-send-btn').style.display = '';
+    document.getElementById('ai-stop-btn').style.display = 'none';
+    document.getElementById('ai-send-btn').disabled = false;
+
+    var resultEl = document.getElementById('ai-result');
+    resultEl.className = 'ai-result on';
+
+    if(topResults.length === 0) {
+      resultEl.innerHTML = '<div style="padding:16px;color:#8E8E93;font-size:13px;">OM Part-A veya Part-B yüklü değil ya da ilgili bölüm bulunamadı.</div>';
+    } else {
+      var html = '<div style="padding:12px 0;">';
+      html += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:1px;margin-bottom:12px;padding:0 16px;">📄 PROCEDURE — OM PART-A / PART-B</div>';
+      topResults.forEach(function(r, i) {
+        var docLabel = r.code === 'OM_Part-A' ? 'OM Part-A' : 'OM Part-B';
+        var docColor = r.code === 'OM_Part-A' ? '#007AFF' : '#5856D6';
+        html += '<div style="margin-bottom:16px;border-left:3px solid '+docColor+';padding:10px 16px;background:#F9F9FB;">';
+        html += '<div style="font-size:9px;font-weight:800;color:'+docColor+';letter-spacing:1px;margin-bottom:6px;">'+docLabel+'</div>';
+        html += '<div style="font-size:12px;color:#1C1C1E;line-height:1.6;white-space:pre-wrap;font-family:monospace;">'+r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()+'</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+      resultEl.innerHTML = html;
+    }
+
+    // Save to history/last report
+    var reportText = topResults.map(function(r){ return '['+r.code+']\n'+r.text.trim(); }).join('\n\n---\n\n');
+    try{ localStorage.setItem('ai_last_report', JSON.stringify({ts:t, reg:registration, query:input, result:reportText})); }catch(e){}
+
+    return; // Skip API call
+  }
+  // ===== END OFFLINE PROCEDURE MODE =====
 
   // Final guard — never send empty content
   var finalContent = (userContent && userContent.trim()) ? userContent : ('A320 Turkish Airlines. Query: ' + input);
