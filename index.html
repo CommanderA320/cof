@@ -3230,7 +3230,7 @@ function sendQuery() {
   var streamedText = '';
 
   // ===== OFFLINE PROCEDURE MODE =====
-  if(_aiMode === 'procedure') {
+  if(_aiMode === 'procedure') { try {
     var procDocs = ['OM Part-A', 'OM Part-B'];
 
     var procResults = [];
@@ -3371,7 +3371,12 @@ function sendQuery() {
     try{ localStorage.setItem('ai_last_report', JSON.stringify({ts:t, reg:registration, query:input, result:reportText})); }catch(e){}
 
     return; // Skip API call
-  }
+  } catch(procErr) {
+    console.error('PROC ERROR:', procErr);
+    var _re = document.getElementById('ai-result');
+    if(_re) { _re.className='ai-result on'; _re.innerHTML='<div style="padding:16px;color:red;font-size:12px;">PROC ERROR: '+procErr.message+'</div>'; }
+    return;
+  }}
   // ===== END OFFLINE PROCEDURE MODE =====
 
   // Final guard — never send empty content
