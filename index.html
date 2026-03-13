@@ -373,6 +373,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
   <button id="confirm" onclick="confirmAll()">CONFIRM ALL</button>
   <button class="nav-btn" id="btn-n" onclick="goNext()">&#8594;</button>
 </div>
+<button id="ai-fab" class="ai-fab" onclick="openAI()"><span class="ai-fab-txt">🤖 AI Scenario Query</span></button>
 <div id="overlay">
   <div class="ov-icon">&#127919;</div>
   <div class="ov-title">All Phases Complete</div>
@@ -2290,7 +2291,11 @@ var REFERENCES = [
 var ap=0, xi=null, bi=null, CK={}, CT={}, CP={};
 
 // ===== STARTUP =====
-_loadData(function(){ ap=0; xi=null; bi=null; render(); });
+_loadData(function(){
+  ap=0; xi=null; bi=null;
+  render();
+  if(_ls('get','ai_screen_open')) openAI();
+});
 
 function utcNow(){var n=new Date();return ("0"+n.getUTCHours()).slice(-2)+":"+("0"+n.getUTCMinutes()).slice(-2);}
 
@@ -2775,6 +2780,7 @@ function toggleContextBox() {
 }
 
 function openAI() {
+  _ls('set', 'ai_screen_open', '1');
   document.getElementById("ai-screen").className = "on";
   checkKey();
   _renderHistory();
@@ -2854,6 +2860,7 @@ function openAI() {
 }
 
 function closeAI() {
+  _ls('rm', 'ai_screen_open');
   document.getElementById("ai-screen").className = "";
   _restoreAIExamples();
 }
