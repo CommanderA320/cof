@@ -3149,7 +3149,8 @@ function openReport(printNow) {
 <body>
 
 <div class="no-print print-bar">
-  <button class="print-btn" onclick="window.print()">⬇ PDF Kaydet / Yazdır</button>
+  <button class="print-btn" onclick="setTimeout(function(){window.print();},400)">⬇ PDF Kaydet / Yazdır</button>
+  <button class="print-btn" style="background:#007AFF;" onclick="(function(){var t=document.title;var h=document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var f=new File([b],t.replace(/[^a-z0-9]/gi,'_')+'.html',{type:'text/html'});if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({title:t,files:[f]}).catch(function(){});}else{navigator.share&&navigator.share({title:t,url:window.location.href}).catch(function(){});}})()">📤 Paylaş / AirDrop</button>
   <button class="close-btn" onclick="window.close()">✕ Kapat</button>
 </div>
 
@@ -3185,36 +3186,9 @@ function openReport(printNow) {
 }
 
 function shareReport() {
-  var timeEl = document.getElementById('ai-result-time');
-  var timestamp = timeEl ? timeEl.textContent : '';
-  var regEl = document.getElementById('ai-reg-input');
-  var reg = regEl ? regEl.value.trim().toUpperCase() : '';
-  var query = (document.getElementById('ai-input') || {}).value || '';
-  var bodyEl = document.getElementById('ai-result-body');
-  var bodyText = bodyEl ? bodyEl.innerText : '';
-
-  var title = 'COF Operational Assessment' + (reg ? ' — ' + reg : '') + (timestamp ? ' ' + timestamp + 'Z' : '');
-  var text = (query ? 'SENARYO: ' + query.trim() + '\n\n' : '') + bodyText;
-
-  if(navigator.share){
-    navigator.share({ title: title, text: text })
-      .catch(function(e){ if(e.name !== 'AbortError') alert('Paylaşım hatası: ' + e.message); });
-  } else {
-    // Fallback: copy to clipboard
-    var full = title + '\n\n' + text;
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(full).then(function(){
-        alert('Rapor panoya kopyalandı. WhatsApp veya e-postaya yapıştırabilirsiniz.');
-      });
-    } else {
-      var ta = document.createElement('textarea');
-      ta.value = full;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      alert('Rapor panoya kopyalandı.');
-    }
+  // Open report window — user can PDF save or use the Share button there
+  openReport(false);
+}
   }
 }
 
