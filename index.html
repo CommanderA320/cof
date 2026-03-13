@@ -436,7 +436,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
       <div class="ai-loading-spinner"></div>
       <div style="font-size:12px;font-weight:700;color:#1C1C1E;margin-top:8px;">Analyzing scenario...</div>
       <div id="ai-loading-sub" style="font-size:10px;color:#8E8E93;margin-top:4px;"></div>
-      <button id="ai-stop-btn" onclick="stopQuery()" style="display:none;margin-top:12px;background:#FF3B30;color:#fff;border:none;border-radius:10px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;">&#x25A0; Durdur</button>
+      <button id="ai-stop-btn" style="display:none;"></button>
     </div>
     <div id="ai-result" class="ai-result">
       <div class="ai-result-header">
@@ -2875,9 +2875,25 @@ function closeAI() {
 }
 function _restoreAIExamples() {
   var exEl=document.getElementById("ai-examples"); if(exEl) exEl.style.display="";
-  var sendBtn=document.getElementById("ai-send-btn"); if(sendBtn){ sendBtn.style.display="flex"; sendBtn.disabled=false; }
-  var stopBtn=document.getElementById("ai-stop-btn"); if(stopBtn) stopBtn.style.display="none";
+  _setSendMode(true);
   _renderHistory();
+}
+function _setSendMode(isSend){
+  var btn=document.getElementById("ai-send-btn");
+  if(!btn) return;
+  if(isSend){
+    btn.style.background="#E30613";
+    btn.style.display="flex";
+    btn.disabled=false;
+    btn.onclick=function(){ sendQuery(); };
+    btn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+  } else {
+    btn.style.background="#FF3B30";
+    btn.style.display="flex";
+    btn.disabled=false;
+    btn.onclick=function(){ stopQuery(); };
+    btn.innerHTML='<span style="font-size:16px;font-weight:900;color:#fff;">&#x25A0;</span>';
+  }
 }
 
 function setExample(idx) {
@@ -3068,9 +3084,7 @@ var _currentAbort = null;
 function stopQuery(){
   if(_currentAbort){ _currentAbort.abort(); _currentAbort = null; }
   document.getElementById('ai-loading').className = 'ai-loading';
-  document.getElementById('ai-send-btn').style.display = 'flex';
-  document.getElementById('ai-stop-btn').style.display = 'none';
-  document.getElementById('ai-send-btn').disabled = false;
+  _setSendMode(true);
 }
 
 function openReport(printNow) {
@@ -3223,11 +3237,7 @@ function sendQuery() {
   document.getElementById("ai-result").className = "ai-result";
   var exEl=document.getElementById("ai-examples"); if(exEl) exEl.style.display="none";
   var hisEl=document.getElementById("ai-history"); if(hisEl) hisEl.style.display="none";
-  document.getElementById("ai-send-btn").style.display = "none";
-  if(_aiMode !== 'procedure') {
-    document.getElementById("ai-stop-btn").style.display = "flex";
-  }
-  document.getElementById("ai-send-btn").disabled = true;
+  _setSendMode(false);
 
   // Loaded docs list
   var loadedDocs = REFERENCES.filter(function(r){
@@ -3557,9 +3567,7 @@ function sendQuery() {
 
     function _done(){
       document.getElementById("ai-loading").className = "ai-loading";
-      document.getElementById("ai-send-btn").style.display = "flex";
-      document.getElementById("ai-stop-btn").style.display = "none";
-      document.getElementById("ai-send-btn").disabled = false;
+      _setSendMode(true);
       // Final render
       document.getElementById("ai-result-body").innerHTML = formatResult(streamedText);
       // Show PDF/Share buttons
@@ -3612,9 +3620,7 @@ function sendQuery() {
   })
   .catch(function(err) {
     document.getElementById("ai-loading").className = "ai-loading";
-    document.getElementById("ai-send-btn").style.display = "flex";
-    document.getElementById("ai-stop-btn").style.display = "none";
-    document.getElementById("ai-send-btn").disabled = false;
+    _setSendMode(true);
     if(err.name !== 'AbortError'){
       document.getElementById("ai-result-body").innerHTML = "<span style=\"color:#D70015;\">API Error: " + err.message + "</span>";
     }
