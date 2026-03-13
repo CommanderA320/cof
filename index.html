@@ -2875,6 +2875,8 @@ function closeAI() {
 }
 function _restoreAIExamples() {
   var exEl=document.getElementById("ai-examples"); if(exEl) exEl.style.display="";
+  var sendBtn=document.getElementById("ai-send-btn"); if(sendBtn){ sendBtn.style.display="flex"; sendBtn.disabled=false; }
+  var stopBtn=document.getElementById("ai-stop-btn"); if(stopBtn) stopBtn.style.display="none";
   _renderHistory();
 }
 
@@ -3072,7 +3074,6 @@ function stopQuery(){
 }
 
 function openReport(printNow) {
-  _ls('rm', 'ai_screen_open'); // prevent main window reload from reopening AI screen
   var bodyHTML = document.getElementById('ai-result-body').innerHTML;
   var timeEl = document.getElementById('ai-result-time');
   var timestamp = timeEl ? timeEl.textContent : '';
