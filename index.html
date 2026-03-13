@@ -483,6 +483,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
   <div class="edit-footer" style="position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;background:#fff;border-top:1px solid #E5E5EA;padding:12px 16px;padding-bottom:max(env(safe-area-inset-bottom,12px),12px);display:flex;gap:10px;z-index:10;">
     <button onclick="_exportData()" style="flex:1;background:#F2F2F7;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x1F4E4; Export</button>
     <button onclick="document.getElementById('import-file').click()" style="flex:1;background:#F2F2F7;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x1F4E5; Import</button>
+    <button onclick="document.getElementById('gh-settings').style.display='block'" style="flex:1;background:#F2F2F7;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x2601;&#xFE0F; GitHub</button>
     <input id="import-file" type="file" accept=".json" style="display:none;" onchange="_importData(event)"/>
   </div>
   <div id="gh-settings" style="display:none;position:fixed;bottom:80px;left:0;right:0;max-width:430px;margin:0 auto;background:#fff;border:1px solid #E5E5EA;border-radius:16px 16px 0 0;padding:16px;z-index:20;box-shadow:0 -4px 20px rgba(0,0,0,0.1);">
