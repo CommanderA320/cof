@@ -3072,6 +3072,7 @@ function stopQuery(){
 }
 
 function openReport(printNow) {
+  _ls('rm', 'ai_screen_open'); // prevent main window reload from reopening AI screen
   var bodyHTML = document.getElementById('ai-result-body').innerHTML;
   var timeEl = document.getElementById('ai-result-time');
   var timestamp = timeEl ? timeEl.textContent : '';
@@ -3149,8 +3150,8 @@ function openReport(printNow) {
 <body>
 
 <div class="no-print print-bar">
-  <button class="print-btn" onclick="setTimeout(function(){window.print();},400)">⬇ PDF Kaydet / Yazdır</button>
-  <button class="print-btn" style="background:#007AFF;" onclick="(function(){var t=document.title;var h=document.documentElement.outerHTML;var b=new Blob([h],{type:'text/html'});var f=new File([b],t.replace(/[^a-z0-9]/gi,'_')+'.html',{type:'text/html'});if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({title:t,files:[f]}).catch(function(){});}else{navigator.share&&navigator.share({title:t,url:window.location.href}).catch(function(){});}})()">📤 Paylaş / AirDrop</button>
+  <button class="print-btn" onclick="window.focus();setTimeout(function(){window.print();},300)">⬇ PDF Kaydet / Yazdır</button>
+  <button class="print-btn" style="background:#007AFF;" onclick="if(navigator.share){navigator.share({title:document.title,text:document.body.innerText}).catch(function(){});}else{alert('Paylaşım bu tarayıcıda desteklenmiyor.');}">📤 Paylaş / AirDrop</button>
   <button class="close-btn" onclick="window.close()">✕ Kapat</button>
 </div>
 
@@ -3188,8 +3189,6 @@ function openReport(printNow) {
 function shareReport() {
   // Open report window — user can PDF save or use the Share button there
   openReport(false);
-}
-  }
 }
 
 function sendQuery() {
