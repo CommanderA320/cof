@@ -2166,6 +2166,12 @@ var REFERENCES = [
 
 var ap=0, xi=null, bi=null, CK={}, CT={}, CP={};
 
+// ===== STARTUP =====
+_loadData(function(){
+  ap=0; xi=null; bi=null;
+  render();
+});
+
 function utcNow(){var n=new Date();return ("0"+n.getUTCHours()).slice(-2)+":"+("0"+n.getUTCMinutes()).slice(-2);}
 
 function getProg(ph){
