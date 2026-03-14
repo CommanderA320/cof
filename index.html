@@ -1652,8 +1652,13 @@ function _getMSNForReg(registration) {
   return null;
 }
 
+function _onRegInput(val){
+  val = val.trim().toUpperCase();
+  _ls('set','ai_registration', val);
+  _updateRegBadge();
+}
+
 function _updateRegBadge(){
-  var badge = document.getElementById('ai-reg-badge');
   if(!badge) return;
   var reg = (document.getElementById('ai-reg-input')||{}).value || _ls('get','ai_registration') || '';
   reg = reg.trim().toUpperCase();
