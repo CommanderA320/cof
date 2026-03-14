@@ -2992,7 +2992,7 @@ function formatResult(text) {
   text = text.replace(/((?:[ \t]*\|.+\|[ \t]*\n)+)/g, function(block){
     var rows = block.trim().split('\n').filter(function(r){ return r.trim(); });
     if(rows.length < 1) return block;
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;">';
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;table-layout:fixed;word-break:break-word;">';
     var isFirst = true;
     rows.forEach(function(row){
       // Skip separator rows: lines like |---|---|---| or |:---|:---:|
