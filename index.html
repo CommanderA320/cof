@@ -166,6 +166,8 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-context-box{background:#F8F8F8;border-radius:12px;border:1px solid #E5E5EA;padding:10px 14px;margin-bottom:12px;cursor:pointer;user-select:none;}
 .ai-context-header{display:flex;align-items:center;justify-content:space-between;}
 .ai-context-title{font-size:10px;font-weight:600;color:#8E8E93;letter-spacing:1px;text-transform:uppercase;}
+.ai-ctx-status-title{font-size:10px;font-weight:800;color:#636366;letter-spacing:1.5px;text-transform:uppercase;}
+.ai-ctx-status-title.ctx-title-loading{animation:pulse-red 0.8s infinite;}
 .ai-context-chevron{font-size:11px;color:#8E8E93;transition:transform 0.2s;}
 .ai-context-chevron.open{transform:rotate(180deg);}
 .ai-context-body{overflow:hidden;max-height:0;transition:max-height 0.25s ease;}
@@ -452,7 +454,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
     </div>
     <div class="ai-context-box" onclick="toggleContext()">
       <div class="ai-context-header">
-        <span id="ai-context-title" class="ai-context-title">Sources loading...</span>
+        <span id="ai-context-title" class="ai-ctx-status-title">Sources loading...</span>
         <span id="ai-context-chevron" class="ai-context-chevron">&#x25BC;</span>
       </div>
       <div id="ai-context-body" class="ai-context-body">
@@ -2811,7 +2813,7 @@ function checkKey(){
   }
 }
 
-function toggleContextBox() {
+function toggleContext() {
   var body = document.getElementById('ai-context-body');
   var chev = document.getElementById('ai-context-chevron');
   if(!body) return;
