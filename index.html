@@ -925,16 +925,19 @@ function _bm25MultiSearch(query, aircraftMSN) {
         var tableText = qrhText.substring(listIdx, Math.min(qrhText.length, listIdx + 3000));
         oebContext = '\n=== QRH: LIST OF EFFECTIVE OPERATIONS ENGINEERING BULLETIN ===\n'
           + 'Read the Title column. Find the EXACT ECAM alert title from this scenario.\n'
-          + 'If found → OEB exists, execute it BEFORE ECAM.
-'\n          + 'If "No Operations Engineering Bulletin impacting QRH" → no OEB, go to ECAM.
-'\n          + '--- TABLE ---
-'\n          + tableText\n          + '\n--- END TABLE ---
-';\n      } else {\n        oebContext = '\n=== QRH OEB CHECK ===
-LIST OF EFFECTIVE page not found in QRH text. Physical QRH check MANDATORY.
-';\n      }\n    } else {\n      oebContext = '
-=== QRH OEB CHECK ===
-QRH not loaded. Physical QRH check MANDATORY before ECAM.
-';\n    }\n  } catch(e) {}\n
+          + 'If found \u2192 OEB exists, execute it BEFORE ECAM.\n'
+          + 'If "No Operations Engineering Bulletin impacting QRH" \u2192 no OEB, go to ECAM.\n'
+          + '--- TABLE ---\n'
+          + tableText
+          + '\n--- END TABLE ---\n';
+      } else {
+        oebContext = '\n=== QRH OEB CHECK ===\nLIST OF EFFECTIVE page not found in QRH text. Physical QRH check MANDATORY.\n';
+      }
+    } else {
+      oebContext = '\n=== QRH OEB CHECK ===\nQRH not loaded. Physical QRH check MANDATORY before ECAM.\n';
+    }
+  } catch(e) {}
+
   // Extract distinct failure/system terms from query for targeted sub-searches
   var subQueries = [query]; // always include full query
   // Always add OEB search — mandatory for every ECAM scenario
@@ -1201,8 +1204,7 @@ function _parseMSNAllocationTable(docText) {
 
   var table = {};
   var count = 0;
-  var lines = tableSection.split(/
-/);
+  var lines = tableSection.split(/\n/);
 
   for(var i = 0; i < lines.length; i++){
     var line = lines[i];
@@ -1288,8 +1290,7 @@ function _updateRegBadge(){
 // Parse applicability tag from FCOM/FCTM ("Applicable to:") or AFM ("Criteria:")
 // Returns: null (no tag found), 'ALL', {msns:[...], types:[...]} or 'ALL'
 function _parseApplicability(text) {
-  var m = text.match(/(?:Applicable\s+to|Criteria)\s*:\s*([^
-\r]{1,200})/i);
+  var m = text.match(/(?:Applicable\s+to|Criteria)\s*:\s*([^\n\r]{1,200})/i);
   if(!m) return null;
   var val = m[1].trim();
 
@@ -1404,9 +1405,10 @@ function _getMELContext(registration){
   }
 
   if(!result.length) return '';
-  var melOut = result.join('\n---\n').substring(0, 800);\n  return '\n
-=== MEL: '+reg+' ===
-'+melOut;\n}\n\n// Build dynamic context tags for UI
+  var melOut = result.join('\n---\n').substring(0, 800);
+  return '\n\n=== MEL: '+reg+' ===\n'+melOut;
+}
+
 function _getLoadedDocTags(){
   var tags = '';
   REFERENCES.forEach(function(ref){
@@ -1500,7 +1502,10 @@ function resetToDefault(){
   _loadData(function(){ ap=0; xi=null; bi=null; closeEdit(); render(); });
 }
 
-// ===== EDIT TRIGGER (brand title'a 5 kez bas) =====\nfunction _editTap(){\n  _editTaps++;\n  clearTimeout(_editTimer);
+// ===== EDIT TRIGGER (brand title'a 5 kez bas) =====
+function _editTap(){
+  _editTaps++;
+  clearTimeout(_editTimer);
   if(_editTaps>=5){ _editTaps=0; openEdit(); return; }
   _editTimer = setTimeout(function(){ _editTaps=0; }, 2000);
 }
