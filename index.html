@@ -171,7 +171,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-context-chevron{font-size:11px;color:#8E8E93;transition:transform 0.2s;}
 .ai-context-chevron.open{transform:rotate(180deg);}
 .ai-context-body{overflow:hidden;max-height:0;transition:max-height 0.25s ease;}
-.ai-context-body.open{max-height:300px;}
+.ai-context-body.open{max-height:600px;overflow-y:auto;}
 @keyframes pulse-red{0%,100%{opacity:1;}50%{opacity:0.15;}}
 .ctx-loading{animation:pulse-red 0.8s infinite;color:#E30613 !important;font-weight:800;}
 .ctx-title-loading{animation:pulse-red 0.8s infinite;}
@@ -1683,6 +1683,13 @@ function _getMSNForReg(registration) {
   var ac = THY_FLEET[registration.toUpperCase().trim()];
   if(ac && ac.msn) return {msn: ac.msn, model: ac.model || ac.type};
   return null;
+}
+
+
+function _onRegInput(val){
+  val = val.trim().toUpperCase();
+  _ls('set','ai_registration', val);
+  _updateRegBadge();
 }
 
 function _updateRegBadge(){
