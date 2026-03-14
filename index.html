@@ -1640,15 +1640,15 @@ function _parseMSNAllocationTable(docText) {
 
 function _getMSNForReg(registration) {
   if(!registration) return null;
-  // First check FCOM parsed table
+  // Fleet DB first — hardcoded, reliable
+  var ac = THY_FLEET[registration.toUpperCase().trim()];
+  if(ac && ac.msn) return {msn: ac.msn, model: ac.model || ac.type};
+  // Fallback: FCOM parsed table
   try {
     var table = JSON.parse(_ls('get','msn_allocation_table') || '{}');
     var fcomEntry = table[registration.toUpperCase()];
     if(fcomEntry && fcomEntry.msn) return fcomEntry;
   } catch(e) {}
-  // Fallback: check Fleet DB for hardcoded msn/model
-  var ac = THY_FLEET[registration.toUpperCase().trim()];
-  if(ac && ac.msn) return {msn: ac.msn, model: ac.model || ac.type};
   return null;
 }
 
