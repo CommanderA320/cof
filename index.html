@@ -343,22 +343,6 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .pwa-install-btn{background:#E30613;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
 .pwa-dismiss{background:none;border:none;color:#AEAEB2;font-size:22px;cursor:pointer;line-height:1;padding:0 2px;}
 
-/* ===== SESSION TIMELINE ===== */
-#timeline-screen{display:none;position:fixed;inset:0;background:#F2F2F7;z-index:400;flex-direction:column;max-width:430px;margin:0 auto;}
-#timeline-screen.on{display:flex;}
-.tl-topbar{background:#1C1C1E;padding:14px 16px;padding-top:max(env(safe-area-inset-top,14px),14px);display:flex;align-items:center;gap:10px;}
-.tl-title{flex:1;font-size:14px;font-weight:900;color:#fff;letter-spacing:0.5px;}
-.tl-close{background:rgba(255,255,255,0.15);border:none;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;}
-.tl-body{flex:1;overflow-y:auto;padding:16px;}
-.tl-day{margin-bottom:20px;}
-.tl-day-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;padding:0 4px;}
-.tl-item{background:#fff;border-radius:12px;border:1px solid #E5E5EA;border-left:4px solid #E30613;padding:12px 14px;margin-bottom:8px;}
-.tl-item-time{font-size:10px;font-family:monospace;font-weight:700;color:#34C759;margin-bottom:4px;}
-.tl-item-text{font-size:13px;color:#1C1C1E;line-height:1.4;}
-.tl-item-type{font-size:9px;font-weight:800;letter-spacing:1px;color:#E30613;text-transform:uppercase;margin-bottom:3px;}
-.tl-empty{text-align:center;padding:60px 20px;color:#8E8E93;font-size:13px;}
-.tl-fab{position:fixed;bottom:90px;left:20px;background:#1C1C1E;border:none;border-radius:20px;padding:10px 16px;display:flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:50;}
-.tl-fab-txt{font-size:12px;font-weight:700;color:#AEAEB2;}
 
 
 
@@ -401,18 +385,9 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
   <button class="nav-btn" id="btn-n" onclick="goNext()">&#8594;</button>
 </div>
 
-<!-- ===== TIMELINE SCREEN ===== -->
-<div id="timeline-screen">
-  <div class="tl-topbar">
-    <div class="tl-title">📋 SESSION TIMELINE</div>
-    <button class="tl-close" onclick="closeTimeline()">✕ Kapat</button>
   </div>
   <div class="tl-body" id="tl-body"></div>
 </div>
-<button class="tl-fab" onclick="openTimeline()">
-  <span style="font-size:14px;">🕐</span>
-  <span class="tl-fab-txt">Timeline</span>
-</button>
 
 <button id="ai-fab" class="ai-fab" onclick="openAI()"><span class="ai-fab-txt">🤖 AI Scenario Query</span></button>
 <div id="overlay">
@@ -2767,7 +2742,6 @@ function confirmAll(){
     }
   }
   CP[ph.id]=true;
-  _tlLog("PHASE_COMPLETE", ph.code + " — " + ph.title);
   render();
   var allDone=true;
   for(var j=0;j<DATA.length;j++){if(!CP[DATA[j].id]){allDone=false;break;}}
@@ -2791,7 +2765,7 @@ function buildLog(){
 
 function goPrev(){if(ap>0){ap--;xi=null;bi=null;render();document.getElementById("list").scrollTop=0;}}
 function goNext(){if(ap<DATA.length-1){ap++;xi=null;bi=null;render();document.getElementById("list").scrollTop=0;}}
-function resetAll(){CK={};CT={};CP={};ap=0;xi=null;bi=null;document.getElementById("overlay").className="";_tlLog("NEW_FLIGHT","Yeni uçuş başlatıldı");render();}
+function resetAll(){CK={};CT={};CP={};ap=0;xi=null;bi=null;document.getElementById("overlay").className="";render();}
 
 
 // ---- AI QUERY ----
@@ -3271,7 +3245,6 @@ function sendQuery() {
   var registration = regEl ? regEl.value.trim().toUpperCase() : (_ls('get','ai_registration')||'');
   if(registration) _ls('set','ai_registration', registration);
   _saveToHistory(input);
-  _tlLog("AI_QUERY", input);
 
   // Show loading (skip spinner for offline procedure mode)
   if(_aiMode !== 'procedure') {
@@ -3701,87 +3674,6 @@ function setAIMode(mode) {
   }
 }
 
-// ===== SESSION TIMELINE =====
-var _TL_KEY = 'cof_timeline';
-
-function _tlLog(type, text) {
-  try {
-    var entries = JSON.parse(localStorage.getItem(_TL_KEY) || '[]');
-    var now = new Date();
-    var dateStr = now.toLocaleDateString('tr-TR', {day:'2-digit',month:'2-digit',year:'numeric'});
-    var timeStr = ('0'+now.getUTCHours()).slice(-2)+':'+('0'+now.getUTCMinutes()).slice(-2)+'Z';
-    entries.unshift({date: dateStr, time: timeStr, type: type, text: text.substring(0, 200)});
-    if(entries.length > 200) entries = entries.slice(0, 200);
-    localStorage.setItem(_TL_KEY, JSON.stringify(entries));
-  } catch(e) {}
-}
-
-function openTimeline() {
-  _renderTimeline();
-  document.getElementById('timeline-screen').className = 'on';
-}
-
-function closeTimeline() {
-  document.getElementById('timeline-screen').className = '';
-}
-
-function _renderTimeline() {
-  var body = document.getElementById('tl-body');
-  try {
-    var entries = JSON.parse(localStorage.getItem(_TL_KEY) || '[]');
-    if(!entries.length) {
-      body.innerHTML = '<div class="tl-empty">Henüz kayıt yok.<br>AI sorguları ve phase işlemleri burada görünecek.</div>';
-      return;
-    }
-    // Group by date
-    var byDate = {};
-    entries.forEach(function(e) {
-      if(!byDate[e.date]) byDate[e.date] = [];
-      byDate[e.date].push(e);
-    });
-    var html = '';
-    var typeColors = {
-      'AI_QUERY': '#E30613',
-      'PHASE_COMPLETE': '#34C759',
-      'AUTH': '#FF9500',
-      'NEW_FLIGHT': '#007AFF',
-      'EDIT': '#5856D6',
-      'DOC_LOAD': '#636366',
-    };
-    var typeLabels = {
-      'AI_QUERY': '🤖 AI Sorgu',
-      'PHASE_COMPLETE': '✅ Phase Tamamlandı',
-      'AUTH': '✍️ Commander Auth',
-      'NEW_FLIGHT': '✈️ Yeni Uçuş',
-      'EDIT': '✏️ Edit',
-      'DOC_LOAD': '📄 Döküman',
-    };
-    Object.keys(byDate).forEach(function(date) {
-      html += '<div class="tl-day"><div class="tl-day-label">' + date + '</div>';
-      byDate[date].forEach(function(e) {
-        var col = typeColors[e.type] || '#636366';
-        var lbl = typeLabels[e.type] || e.type;
-        html += '<div class="tl-item" style="border-left-color:'+col+';">' +
-          '<div class="tl-item-type" style="color:'+col+';">'+lbl+'</div>' +
-          '<div class="tl-item-time">'+e.time+'</div>' +
-          '<div class="tl-item-text">'+_esc(e.text)+'</div>' +
-          '</div>';
-      });
-      html += '</div>';
-    });
-    // Clear button
-    html += '<button onclick="_clearTimeline()" style="width:100%;background:#FFF0F0;border:1px solid #FFCDD2;border-radius:10px;padding:12px;font-size:12px;font-weight:700;color:#D70015;cursor:pointer;margin-top:8px;">🗑 Tüm Geçmişi Temizle</button>';
-    body.innerHTML = html;
-  } catch(e) {
-    body.innerHTML = '<div class="tl-empty">Hata: ' + e.message + '</div>';
-  }
-}
-
-function _clearTimeline() {
-  if(!confirm('Tüm timeline geçmişi silinsin mi?')) return;
-  localStorage.removeItem(_TL_KEY);
-  _renderTimeline();
-}
 
 </script>
 </body>
