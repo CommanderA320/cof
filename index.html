@@ -1425,6 +1425,51 @@ function _getOEBsForMSN(msn) {
   });
 }
 
+// OEB62 FULL PROCEDURE — hardcoded for guaranteed retrieval
+var OEB62_PROCEDURE = [
+  '=== OEB62 — RED OEB — AIR ENG 1(2) BLEED FAULT or AIR ENG 1+2 BLEED FAULT ===',
+  'ECAM ENTRY: AIR ENG 1(2) BLEED FAULT, or AIR ENG 1+2 BLEED FAULT',
+  'OEB COLOR: RED — MANDATORY — affects safe operation',
+  'APPLICABILITY: All A319neo A320neo A321neo WITHOUT MOD 175847 (G1611) for CFM or MOD 175846 (G1610) for PW',
+  '',
+  'AT ANY TIME: If CAB PR EXCESS CAB ALT alert triggers → IMMEDIATELY APPLY CAB PR EXCESS CAB ALT ECAM PROC',
+  '',
+  '--- If AIR ENG 1(2) BLEED FAULT (single engine): ---',
+  'BLEED SD page........................CHECK',
+  'Check: air temperature, bleed valve position, air pressure.',
+  'If bleed air temp BELOW 250C AND bleed valve OPEN (amber) AND pressure ABOVE 60 PSI:',
+  '  ENG BLEED (affected side)........................OFF',
+  '  WING ANTI ICE........................OFF',
+  '  X BLEED........................OPEN',
+  '  AVOID ICING CONDITIONS',
+  '  If opposite PACK available: PACK (affected side)........................OFF',
+  '  If AIR ENG 1 BLEED FAULT: APU BLEED........................OFF',
+  '  DO NOT RESET ENG BLEED (affected)',
+  'In all other cases: ECAM PROC........................APPLY',
+  'If bleed air temp ABOVE 250C: ECAM PROC........................APPLY',
+  '',
+  '--- If AIR ENG 1+2 BLEED FAULT (both engines): ---',
+  'BLEED SD page........................CHECK',
+  'Check air pressure of BOTH engine bleeds.',
+  'If BOTH engine bleeds air pressure BELOW 60 PSI:',
+  '  ECAM PROC........................APPLY  ← OEB redirects to ECAM for this branch',
+  'If AT LEAST ONE engine bleed air pressure ABOVE 60 PSI:',
+  '  X BLEED........................OPEN',
+  '  Both ENG BLEED........................OFF',
+  '  APU BLEED........................OFF',
+  '  WING ANTI ICE........................OFF',
+  '  AVOID ICING CONDITIONS',
+  '  DES TO FL 100/MEA-MORA',
+  '  When at or below FL 100/MEA-MORA AND CAB PR delta-P < 1 PSI:',
+  '    RAM AIR........................ON',
+  '  MAX FL: 100/MEA-MORA',
+  '  DO NOT RESET BOTH ENG BLEEDS',
+  '',
+  'ROOT CAUSE: HPV sealing ring clip rupture → HPV does not fully close → excessive residual leakage',
+  '→ pressure lock-up risk in bleed ducts if all consumers switched OFF',
+  '=== END OEB62 ==='
+].join('\n');
+
 function _getOEBContextForMSN(msn) {
   var oebList = _getOEBsForMSN(msn);
   if(!oebList.length) return '';
@@ -1435,7 +1480,13 @@ function _getOEBContextForMSN(msn) {
   out += 'RED OEB = affects safe operation (mandatory). WHITE OEB = affects aircraft operation.\n\n';
   if(red.length){
     out += '--- RED OEB (' + red.length + ') ---\n';
-    red.forEach(function(o){ out += '[RED] ' + o.id + ': ' + o.title + '\n'; });
+    red.forEach(function(o){
+      out += '[RED] ' + o.id + ': ' + o.title + '\n';
+      // Inject full OEB62 procedure if this is the bleed fault OEB
+      if(o.title && o.title.indexOf('BLEED AIR SUPPLY') > -1){
+        out += OEB62_PROCEDURE + '\n';
+      }
+    });
   }
   if(white.length){
     out += '--- WHITE OEB (' + white.length + ') ---\n';
