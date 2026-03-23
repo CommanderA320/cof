@@ -1298,12 +1298,11 @@ function _chunkDoc(docCode, docTitle, text){
   // FCTM, OM Part-B, and FCOM (normal/abnormal procedure sections): smaller chunks (120 words)
   // Other docs: standard chunks (350 words)
   var isTechnique = (docCode === 'FCTM' || docCode === 'OM Part-B');
-  var isFCOM = (docCode === 'FCOM');
-  var maxWords = (isTechnique || isFCOM) ? 120 : 350;
+  var maxWords = isTechnique ? 120 : 350;
 
-  // Split triggers — general + FCTM/FCOM procedure-specific patterns
-  var splitPattern = (isTechnique || isFCOM)
-    ? /\n{1,}|(?=\b(?:SHALL|MUST|WARNING|CAUTION|NOTE|PROCEDURE|ECAM|QRH|ACTION|IF |THEN |CHECK|STEP|CAPTAIN|COMMANDER|PF\b|PM\b|F\/O|CALLOUT|TECHNIQUE|BEFORE|AFTER|DURING|TAXI|TAKEOFF|LANDING|APPROACH|NORMAL PROC|ABNORMAL|EMERGENCY|BRAKE|HYDRAULIC|ELECTRICAL|FUEL|PRESSURI|PRO-NOR|PRO-ABN|PRO-EMR|SOP|Ident\.)\b)/i
+  // Split triggers — FCTM/OM Part-B get finer splits, others standard
+  var splitPattern = isTechnique
+    ? /\n{1,}|(?=\b(?:SHALL|MUST|WARNING|CAUTION|NOTE|PROCEDURE|ECAM|QRH|ACTION|IF |THEN |CHECK|STEP|CAPTAIN|COMMANDER|PF\b|PM\b|F\/O|CALLOUT|TECHNIQUE|BEFORE|AFTER|DURING|TAXI|TAKEOFF|LANDING|APPROACH|NORMAL PROC|ABNORMAL|EMERGENCY|BRAKE|HYDRAULIC|ELECTRICAL|FUEL|PRESSURI)\b)/i
     : /\n{2,}|(?=\b(?:SHALL|MUST|WARNING|CAUTION|NOTE|PROCEDURE|ECAM|QRH|ACTION|IF |THEN |CHECK|STEP)\b)/i;
 
   var paras = text.split(splitPattern);
@@ -1353,6 +1352,12 @@ function _bm25Score(chunk, queryTerms, aircraftMSN){
     score += idf * (tf*(k1+1)) / (tf + k1*(1-b+b*N/avgdl));
   });
   if(score === 0) return 0;
+  // Boost: PRO-NOR / FCTM chunks for normal procedure queries
+  var isNormalQuery = !/ECAM|FIRE|FAIL|FAULT|SMOKE|EMERGENCY|MEL\b|OEB|MAYDAY|BLEED|ELEC EMER|HYD LOSS|STALL|TCAS RA/i.test(queryTerms.join(' '));
+  if(isNormalQuery){
+    if(chunk.doc === 'FCTM' || chunk.doc === 'OM Part-B') score *= 2.0;
+    if(chunk.doc === 'FCOM' && /PRO-NOR|SOP|NORMAL|TAXI|BRAKE|CALLOUT|PF|PM/i.test(chunk.text)) score *= 1.8;
+  }
   // Boost: procedure keywords
   if(/\b(SHALL|MUST|WARNING|CAUTION|ECAM|QRH|ACTION|INOPERATIVE|INOP|DISPATCH|DEFERRED)\b/i.test(chunk.text)) score *= 1.4;
   // Boost: multiple query terms
