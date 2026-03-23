@@ -16321,3 +16321,104 @@ flight level: 100  or  MEA - MORA .
 When cabin differential pressure below  1 :
 Turn on RAM AIR.
 Do not reset both engine bleeds.
+AIR ENG 1(2) BLEED FAULT or AIR ENG 1+2 BLEED FAULT
+This  OEB  is published in order to provide the procedures
+to avoid a pressure lock-up in the air bleed ducts in case of Pressure
+Regulating Valve in failed open position because of High Pressure
+Valve broken seal.
+All A319neo, A320neo and A321neo aircraft without MOD 175847 (G1611)
+for CFM engines or MOD 175846 (G1610) for PW engines
+2025-03-25T00:00:00  2025-03-25
+Head of Airbus Flight Operations & Training Support
+AIR ENG 1(2) BLEED FAULT or AIR ENG 1+2 BLEED FAULT
+ECAM Entry
+AIR  ENG 1(2) BLEED FAULT  , or
+AIR  ENG 1+2 BLEED FAULT
+Procedure
+AT ANY TIME of the procedure, if
+CAB PR  EXCESS CAB
+ALT
+alert triggers, IMMEDIATELY APPLY:
+CAB PR  EXCESS CAB
+ALT
+ECAM PROC
+If
+AIR  ENG 1(2) BLEED FAULT  :
+BLEED
+CHECK
+For the affected system,
+check:
+The air temperature
+The position
+of the engine bleed valve
+The air pressure.
+If affected engine bleed air temperature below  250 :
+If affected engine bleed valve indicated open (in line) in
+amber AND associated engine bleed air pressure above  60 :
+ENG BLEED (affected side)  OFF
+WING ANTI ICE  OFF
+X BLEED  OPEN
+AVOID ICING CONDITIONS
+If opposite PACK available:
+PACK (affected side)  OFF
+If
+AIR  ENG 1 BLEED FAULT  :
+APU  BLEED  OFF
+DO NOT RESET ENG BLEED
+(affected)
+In all other cases:
+ECAM
+PROC
+APPLY
+If affected engine bleed air temperature above  250 :
+ECAM
+PROC
+APPLY
+If
+AIR  ENG 1+2 BLEED FAULT  :
+BLEED
+CHECK
+Check the air pressure
+of both engine bleeds.
+If both engine bleeds air pressure below  60 :
+ECAM
+PROC
+APPLY
+If at least one engine bleed air pressure above  60 :
+X BLEED  OPEN
+Both ENG BLEED  OFF
+APU  BLEED  OFF
+WING ANTI ICE  OFF
+AVOID ICING CONDITIONS
+DES TO FL 100/MEA-MORA
+When at or below  FL  100/MEA-MORA and CAB PR ΔP <  1 :
+RAM AIR  ON
+MAX  FL
+100/MEA-MORA
+DO NOT RESET BOTH
+ENG BLEEDS
+AIR ENG 1(2) BLEED FAULT or AIR ENG 1+2 BLEED FAULT - Explanation
+Root Cause
+An early degradation and rupture of the
+clip of the High Pressure Valve ( HPV ) causes the  HPV  sealing ring to come away from the valve.  In this case, the  HPV  does
+not entirely close as required, resulting in an excessive residual
+leakage.
+In addition,
+the  HPV  sealing ring that is broken and missing may go
+downstream and also prevent the engine bleed valve from closing correctly.
+The high pressure bleed air may reach the bleed ducts of the bleed
+air consumers. If all the bleed air consumers are OFF, a pressure
+lock-up (increase of pressure in a closed volume) occurs with a possible
+risk of damage to the bleed ducts.
+Operational Consequence
+In the case that high pressure air goes
+downstream the engine bleed valve, the
+AIR  ENG 1(2) BLEED
+FAULT
+or
+AIR  ENG 1+2 BLEED FAULT
+alert triggers.  The application
+of the associated  ECAM  procedures requests to switch off
+all the bleed air consumers of the affected side(s). In order to prevent
+this situation, an alternative procedure must be applied in order
+to ensure that at least one bleed air consumer remains on.
