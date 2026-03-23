@@ -831,6 +831,49 @@ function _renderDocManager(){
     +'<div style="font-size:10px;color:#636366;padding:2px 0;">'+cached+' / '+REFERENCES.length+' döküman yüklü</div>';
   body.appendChild(storDiv);
 
+  // Drag & drop zone at top
+  var dropZone = document.createElement('div');
+  dropZone.style.cssText = 'border:2px dashed #C7C7CC;border-radius:12px;padding:14px;text-align:center;margin-bottom:10px;color:#8E8E93;font-size:12px;transition:all 0.2s;';
+  dropZone.innerHTML = '📂 PDF veya XML dosyasını buraya sürükle & bırak';
+  dropZone.addEventListener('dragover', function(e){
+    e.preventDefault();
+    dropZone.style.borderColor='#007AFF';
+    dropZone.style.color='#007AFF';
+    dropZone.style.background='#F0F6FF';
+  });
+  dropZone.addEventListener('dragleave', function(){
+    dropZone.style.borderColor='#C7C7CC';
+    dropZone.style.color='#8E8E93';
+    dropZone.style.background='';
+  });
+  dropZone.addEventListener('drop', function(e){
+    e.preventDefault();
+    dropZone.style.borderColor='#C7C7CC';
+    dropZone.style.color='#8E8E93';
+    dropZone.style.background='';
+    var file = e.dataTransfer.files[0];
+    if(!file) return;
+    var fname = file.name.toLowerCase();
+    if(!fname.endsWith('.pdf') && !fname.endsWith('.xml')){
+      alert('Sadece PDF veya XML dosyası yüklenebilir.');
+      return;
+    }
+    // Prompt user to pick which doc slot this belongs to
+    var codes = REFERENCES.map(function(r){ return r.code + ' — ' + r.title; });
+    var choice = prompt('Hangi dökümana yüklensin?\n\n' + codes.join('\n') + '\n\nKod girin (örn: FCTM):');
+    if(!choice) return;
+    choice = choice.trim().toUpperCase();
+    var ref = REFERENCES.find(function(r){ return r.code.toUpperCase() === choice; });
+    if(!ref){ alert('Kod bulunamadı: ' + choice); return; }
+    try{ localStorage.setItem('doc_filename_'+ref.code, file.name); }catch(ex){}
+    if(fname.endsWith('.xml')){
+      _extractXML(file, ref.code);
+    } else {
+      _extractPDF(file, ref.code);
+    }
+  });
+  body.appendChild(dropZone);
+
   // Header with + New Doc button
   var docHdr = document.createElement('div');
   docHdr.className = 'edit-sec-lbl';
@@ -886,7 +929,7 @@ function _renderDocManager(){
     delBtn.textContent = '×';
     delBtn.title = 'Sil';
     // Only show × for custom docs — built-in docs cannot be deleted
-    delBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#FF3B30;font-size:20px;font-weight:700;cursor:pointer;padding:4px 8px;line-height:1;z-index:10;display:' + (_isCustomDoc ? 'block' : 'none') + ';';
+    delBtn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#FF3B30;font-size:20px;font-weight:700;cursor:pointer;padding:4px 8px;line-height:1;z-index:10;display:block;';
     delBtn.onclick = function(e){
       e.stopPropagation();
       if(!confirm(refCode+' dökümanını listeden kaldır?')) return;
@@ -920,9 +963,15 @@ function _renderDocManager(){
 
     var info = document.createElement('div');
     info.className = 'doc-info';
-    info.innerHTML = '<div class="doc-title">'+ref.title+'</div>'
+    var _savedFilename = '';
+    try{ _savedFilename = localStorage.getItem('doc_filename_'+refCode) || ''; }catch(ex){}
+    info.innerHTML = '<div class="doc-title" style="display:flex;align-items:center;gap:6px;">'
+      +'<span class="doc-title-text">'+ref.title+'</span>'
+      +'<button onclick="_renameDoc(\''+refCode+'\')" style="background:none;border:none;font-size:11px;color:#8E8E93;cursor:pointer;padding:0 2px;" title="Yeniden adlandır">✏️</button>'
+      +'</div>'
       +(ref.rev?'<div class="doc-meta">'+ref.rev+'</div>':'')
-      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB — ☁️ GitHub</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
+      +(_savedFilename?'<div class="doc-meta" style="color:#636366;">📎 '+_savedFilename+'</div>':'')
+      +(hasDoc?'<div class="doc-meta" style="color:#34C759;">✅ '+Math.round(stored.length/1024)+' KB</div>':'<div class="doc-meta" style="color:#FF9500;">⚠️ Yüklenmedi</div>')
       +(!hasDoc && progress?'<div class="doc-progress">'+progress+'</div>':'');
 
     // Label wrapping input — works natively in Safari without .click()
@@ -934,6 +983,7 @@ function _renderDocManager(){
     fileInput.onchange = function(e){
       var file = e.target.files[0];
       if(file){
+        try{ localStorage.setItem('doc_filename_'+refCode, file.name); }catch(ex){}
         if(file.name.toLowerCase().endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml'){
           _extractXML(file, refCode);
         } else {
@@ -998,6 +1048,7 @@ function _renderDocManager(){
         alert('Sadece PDF veya XML dosyası yüklenebilir.');
         return;
       }
+      try{ localStorage.setItem('doc_filename_'+refCode, file.name); }catch(ex){}
       if(fname.endsWith('.xml')){
         _extractXML(file, refCode);
       } else {
@@ -1024,6 +1075,21 @@ function _renderDocManager(){
   }
 }
 
+
+function _renameDoc(refCode){
+  var ref = REFERENCES.find(function(r){ return r.code === refCode; });
+  if(!ref) return;
+  var newTitle = prompt('Döküman adını değiştir:', ref.title);
+  if(!newTitle || !newTitle.trim()) return;
+  ref.title = newTitle.trim();
+  // Persist if custom
+  try{
+    var cr = JSON.parse(localStorage.getItem('custom_refs')||'[]');
+    var ci = cr.findIndex(function(r){ return r.code === refCode; });
+    if(ci > -1){ cr[ci].title = ref.title; localStorage.setItem('custom_refs', JSON.stringify(cr)); }
+  }catch(e){}
+  _renderDocManager();
+}
 
 function _showNewDocModal(){
   _openModal('+ Yeni Döküman', function(mbody, mbtns){
