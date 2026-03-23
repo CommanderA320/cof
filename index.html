@@ -1186,11 +1186,26 @@ function _extractXML(file, docCode){
   reader.onload = function(e){
     var raw = e.target.result;
     // Strip XML tags, decode entities, clean whitespace
+    // Step 1: Preserve challenge/response pairs as readable procedure steps
     var text = raw
       .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, ' $1 ')
+      // Convert OEB/QRH procedure steps: <challenge>X</challenge><response>Y</response> → "X........................Y"
+      .replace(/<challenge[^>]*>([^<]+)<\/challenge>\s*<response[^>]*>([^<]+)<\/response>/gi, function(m, ch, re){ return '\n' + ch.trim() + '........................' + re.trim() + '\n'; })
+      // Convert condition intros: <intro>If X:</intro> → "\nIf X:"
+      .replace(/<intro[^>]*>([^<]+)<\/intro>/gi, function(m, txt){ return '\n' + txt.trim() + '\n'; })
+      // Convert titles: <title>X</title> → "\n=== X ===\n"
+      .replace(/<title[^>]*>([^<]{3,80})<\/title>/gi, function(m, txt){ return '\n=== ' + txt.trim() + ' ===\n'; })
+      // Convert para/command: keep text
+      .replace(/<para[^>]*>([^<]+)<\/para>/gi, function(m, txt){ return ' ' + txt.trim() + ' '; })
+      // Convert abb tags: <abb>X</abb> → X
+      .replace(/<abb>([^<]+)<\/abb>/gi, '$1')
+      // Convert tech-label: <tech-label...>X</tech-label> → X
+      .replace(/<tech-label[^>]*>([^<]+)<\/tech-label>/gi, '$1')
+      // Strip remaining tags
       .replace(/<[^>]+>/g, ' ')
       .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ').replace(/&#\d+;/g,' ')
-      .replace(/\s{3,}/g,'\n')
+      .replace(/[ \t]{3,}/g,' ')
+      .replace(/\n{3,}/g,'\n\n')
       .trim();
     var kb = Math.round(text.length/1024);
     _docExtractProgress[docCode] = '⏳ GitHub\u2019a y\u00fckleniyor... ('+kb+'KB, XML)';
@@ -1261,7 +1276,8 @@ function _chunkDoc(docCode, docTitle, text){
   // FCTM, OM Part-B, and FCOM (normal/abnormal procedure sections): smaller chunks (120 words)
   // Other docs: standard chunks (350 words)
   var isTechnique = (docCode === 'FCTM' || docCode === 'OM Part-B');
-  var maxWords = isTechnique ? 120 : 350;
+  var isQRH = (docCode === 'QRH');
+  var maxWords = isTechnique ? 120 : isQRH ? 150 : 350;
 
   // Split triggers — FCTM/OM Part-B get finer splits, others standard
   var splitPattern = isTechnique
@@ -1321,6 +1337,11 @@ function _bm25Score(chunk, queryTerms, aircraftMSN){
     if(chunk.doc === 'FCTM' || chunk.doc === 'OM Part-B') score *= 2.0;
     if(chunk.doc === 'FCOM' && /PRO-NOR|SOP|NORMAL|TAXI|BRAKE|CALLOUT|PF|PM/i.test(chunk.text)) score *= 1.8;
   }
+  // OEB PROCEDURE BOOST — highest priority: OEB procedure pages in QRH
+  // Matches: ECAM ENTRY, OEBPROC, X BLEED, RAM AIR (OEB-specific keywords)
+  if(chunk.doc === 'QRH' && /ECAM ENTRY|OEBPROC|X BLEED.*OPEN|RAM AIR.*ON|DO NOT RESET|AVOID ICING|MOD\s*\d{5,}|G\d{4}\b/i.test(chunk.text)) score *= 4.0;
+  // Boost QRH chunks that match the specific ECAM alert title in query
+  if(chunk.doc === 'QRH') score *= 1.5;
   // Boost: procedure keywords
   if(/\b(SHALL|MUST|WARNING|CAUTION|ECAM|QRH|ACTION|INOPERATIVE|INOP|DISPATCH|DEFERRED)\b/i.test(chunk.text)) score *= 1.4;
   // Boost: multiple query terms
