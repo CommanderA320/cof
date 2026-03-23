@@ -892,6 +892,30 @@ function _renderDocManager(){
     badge.style.cssText = 'width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+ref.color+';';
     topLine.appendChild(badge);
 
+    // Remove row button (top right)
+    var removeBtn = document.createElement('button');
+    removeBtn.textContent = '✕';
+    removeBtn.title = 'Remove from list';
+    removeBtn.style.cssText = 'background:none;border:none;color:#C7C7CC;font-size:14px;cursor:pointer;padding:0 0 0 8px;line-height:1;flex-shrink:0;';
+    removeBtn.onmouseover = function(){ removeBtn.style.color='#FF3B30'; };
+    removeBtn.onmouseout = function(){ removeBtn.style.color='#C7C7CC'; };
+    removeBtn.onclick = function(){
+      if(!confirm(refCode+' — Remove from list completely?')) return;
+      var idx = REFERENCES.findIndex(function(r){ return r.code === refCode; });
+      if(idx > -1) REFERENCES.splice(idx, 1);
+      try{ localStorage.removeItem('doc_text_'+refCode); }catch(e){}
+      try{ localStorage.removeItem('doc_filename_'+refCode); }catch(e){}
+      try{
+        var cr = JSON.parse(localStorage.getItem('custom_refs')||'[]');
+        cr = cr.filter(function(r){ return r.code !== refCode; });
+        localStorage.setItem('custom_refs', JSON.stringify(cr));
+      }catch(e){}
+      delete _docCache[refCode];
+      delete _docExtractProgress[refCode];
+      _renderDocManager();
+    };
+    topLine.appendChild(removeBtn);
+
     // Inline editable title
     var titleSpan = document.createElement('span');
     titleSpan.textContent = ref.title;
@@ -982,17 +1006,17 @@ function _renderDocManager(){
     // ADD button
     var addBtn = document.createElement('label');
     addBtn.htmlFor = 'fi-'+refCode;
-    addBtn.textContent = hasDoc ? '🔄 Güncelle' : '⬆️ Yükle';
+    addBtn.textContent = hasDoc ? '🔄 Update' : '⬆️ Add';
     addBtn.style.cssText = 'background:#007AFF;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;flex:1;text-align:center;';
     btnRow.appendChild(addBtn);
 
     // DELETE CONTENT button
     var delBtn = document.createElement('button');
-    delBtn.textContent = '🗑 İçeriği Sil';
+    delBtn.textContent = '🗑 Delete';
     delBtn.style.cssText = 'background:'+(hasDoc?'#FF3B30':'#E5E5EA')+';color:'+(hasDoc?'#fff':'#C7C7CC')+';border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:'+(hasDoc?'pointer':'default')+';flex:1;';
     if(hasDoc){
       delBtn.onclick = function(){
-        if(!confirm(refCode+' döküman içeriği silinsin mi? Başlık ve revizyon bilgisi korunur.')) return;
+        if(!confirm(refCode+' — Delete document content? Title and revision info will be kept.')) return;
         try{ localStorage.removeItem('doc_text_'+refCode); }catch(e){}
         try{ localStorage.removeItem('doc_filename_'+refCode); }catch(e){}
         delete _docCache[refCode];
