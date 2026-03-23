@@ -16005,3 +16005,319 @@ PACK 1+2
 AS RQRD
 Confirm that the  MAINTENANCE  TEMP CTL 1 and TEMP CTL 2 messages are no longer
 displayed on the  STATUS .
+AIR - X BLEED FAULT
+Use crossbleed valve manual
+control.
+If crossbleed valve failed closed
+and one bleed inoperative, wing anti-ice is inoperative.  .
+AIR - ENG 1+2 BLEED FAULT
+NO LEAK
+Set the crossbleed valve to
+auto.
+Turn off wing anti-ice.
+If wing anti-ice is
+shut off,  .
+If  APU  bleed is on and fails:
+Turn off  APU  bleed.
+Turn off then on both engine
+bleeds.
+If no engine bleed reset successful:
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA .
+Start  APU .
+If  APU  available:
+When below  200 :
+Turn on  APU  bleed.
+Turn off pack 2 if
+pack 1 is operative.
+If  APU  bleed available:
+Maximum flight level:  200 .
+Turn on both packs.
+Turn on both engine
+bleeds.
+Turn off  APU  bleed.
+If no engine bleed reset successful:
+Turn on  APU  bleed.
+Turn off pack 2 if
+pack 1 is operative.
+Turn off both engine
+bleeds.
+If  APU  bleed not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on both packs.
+Turn on both engine
+bleeds.
+If no engine bleed reset successful:
+Turn off both engine
+bleeds.
+Maximum flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If  APU  not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on both packs.
+Turn on both engine
+bleeds.
+If no engine bleed reset successful:
+Turn off both engine
+bleeds.
+Maximum flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+LEFT LEAK
+Close the crossbleed valve.
+Turn off wing anti-ice.
+If wing anti-ice is
+shut off,  .
+If  APU  bleed is on:
+Turn off  APU  bleed.
+Turn off then on engine 2 bleed.
+If engine 2 bleed reset unsuccessful:
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA .
+When at or below  100  or  MEA - MORA :
+Turn on pack 2.
+Turn on engine 2 bleed.
+If engine 2 bleed reset unsuccessful:
+Turn off engine 2
+bleed.
+Maximum flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+RIGHT LEAK
+Close the crossbleed valve.
+Turn off wing anti-ice.
+If wing anti-ice is
+shut off,  .
+If  APU  bleed is on and fails:
+Turn off  APU  bleed.
+Turn off then on engine 1 bleed.
+If engine 1 bleed reset unsuccessful:
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA .
+Start  APU .
+If  APU  available:
+When below  200 :
+Turn on  APU  bleed.
+If  APU  bleed available:
+Maximum flight level:  200 .
+Turn on pack 1.
+Turn on engine 1 bleed.
+Turn off  APU  bleed.
+If engine 1 bleed reset unsuccessful:
+Turn on  APU  bleed.
+Turn off engine 1
+bleed.
+If  APU  bleed not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on pack 1.
+Turn on engine 1 bleed.
+If engine 1 bleed reset unsuccessful:
+Turn off engine 1
+bleed.
+Maximum flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If  APU  not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on pack 1.
+Turn on engine 1 bleed.
+If engine 1 bleed reset unsuccessful:
+Turn off engine 1
+bleed.
+Maximum flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+LEFT LEAK AND RIGHT LEAK
+Close the crossbleed valve.
+Turn off wing anti-ice.
+If wing anti-ice is
+shut off,  .
+If  APU  bleed is on:
+Turn off  APU  bleed.
+Turn off both engine bleeds.
+Initiate a descent to the higher
+of:  100  or  MEA - MORA.
+Maximum flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+AIR ENG 1+2 BLEED FAULT
+In case of NO overpressure on both engine bleeds (pressure
+below  60  on both engine bleeds):
+If NO LEAK:
+Set the crossbleed
+valve to auto.
+Turn off wing anti-ice.
+If wing anti-ice is shut off,  .
+If  APU  bleed is on and fails:
+Turn off  APU  bleed.
+Turn off then on both
+engine bleeds.
+If no engine bleed reset successful:
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA .
+Start  APU .
+If  APU  available:
+When below  200 :
+Turn on  APU  bleed.
+Turn off pack 2 if
+pack 1 is operative.
+If  APU  bleed available:
+Maximum
+flight level:  200 .
+Turn on both packs.
+Turn on both engine
+bleeds.
+Turn off  APU  bleed.
+If no engine bleed reset successful:
+Turn on  APU  bleed.
+Turn off pack 2 if
+pack 1 is operative.
+Turn off both engine
+bleeds.
+If  APU  bleed not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on both packs.
+Turn on both engine
+bleeds.
+If no engine bleed reset successful:
+Turn off both engine
+bleeds.
+Maximum
+flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If  APU  not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on both packs.
+Turn on both engine
+bleeds.
+If no engine bleed reset successful:
+Turn off both engine
+bleeds.
+Maximum
+flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If LEFT LEAK:
+Close the crossbleed
+valve.
+Turn off wing anti-ice.
+If wing anti-ice is shut off,  .
+If  APU  bleed is on:
+Turn off  APU  bleed.
+Turn off then on engine
+2 bleed.
+If engine 2 bleed reset unsuccessful:
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA .
+When at or below  100  or  MEA - MORA :
+Turn on pack 2.
+Turn on engine 2 bleed.
+If engine 2 bleed reset unsuccessful:
+Turn off engine 2
+bleed.
+Maximum
+flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If RIGHT LEAK:
+Close the crossbleed
+valve.
+Turn off wing anti-ice.
+If wing anti-ice is shut off,  .
+If  APU  bleed is on and fails:
+Turn off  APU  bleed.
+Turn off then on engine
+1 bleed.
+If engine 1 bleed reset unsuccessful:
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA .
+Start  APU .
+If  APU  available:
+When below  200 :
+Turn on  APU  bleed.
+If  APU  bleed available:
+Maximum
+flight level:  200 .
+Turn on pack 1.
+Turn on engine 1 bleed.
+Turn off  APU  bleed.
+If engine 1 bleed reset unsuccessful:
+Turn on  APU  bleed.
+Turn off engine 1
+bleed.
+If  APU  bleed not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on pack 1.
+Turn on engine 1 bleed.
+If engine 1 bleed reset unsuccessful:
+Turn off engine 1
+bleed.
+Maximum
+flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If  APU  not available:
+Turn off  APU  bleed.
+When at or below  100  or  MEA - MORA :
+Turn on pack 1.
+Turn on engine 1 bleed.
+If engine 1 bleed reset unsuccessful:
+Turn off engine 1
+bleed.
+Maximum
+flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+If LEFT AND RIGHT LEAK:
+Close the crossbleed
+valve.
+Turn off wing anti-ice.
+If wing anti-ice is shut off,  .
+If  APU  bleed is on:
+Turn off  APU  bleed.
+Turn off both engine
+bleeds.
+Initiate a descent
+to the higher of:  100  or  MEA - MORA.
+Maximum
+flight level:  100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+In case of overpressure on at least one engine bleed (pressure
+above  60  on at least one engine bleed):
+Open the crossbleed
+valve.
+Turn off both engine
+bleeds.
+Turn off  APU  bleed.
+Turn off wing anti-ice.
+If wing anti-ice is shut off,
+Avoid icing conditions.
+Initiate a descent
+to the highest of:  100  or  MEA - MORA .
+Maximum
+flight level: 100  or  MEA - MORA .
+When cabin differential pressure below  1 :
+Turn on RAM AIR.
+Do not reset both engine bleeds.
