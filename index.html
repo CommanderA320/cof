@@ -3203,6 +3203,15 @@ function openReport(printNow) {
   var regEl = document.getElementById('ai-reg-input');
   var reg = regEl ? regEl.value.trim().toUpperCase() : '';
   var query = document.getElementById('ai-input') ? document.getElementById('ai-input').value.trim() : '';
+  // MSN from badge
+  var badgeEl = document.getElementById('ai-reg-badge');
+  var msn = '';
+  if(badgeEl && badgeEl.textContent && badgeEl.textContent.indexOf('MSN') > -1){
+    var msnMatch = badgeEl.textContent.match(/MSN\s*([\d]+)/);
+    if(msnMatch) msn = msnMatch[1];
+  }
+  // Short query — first 60 chars, clean
+  var shortQuery = query ? query.replace(/[\n\r]+/g,' ').substring(0,60).trim() + (query.length>60?'...':'') : 'Assessment';
 
   var win = window.open('', '_blank');
   if(!win) return;
@@ -3212,7 +3221,7 @@ function openReport(printNow) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>COF Operational Assessment ${timestamp}</title>
+<title>COF ${reg ? reg : "A320"} ${msn ? "· MSN "+msn : ""} — ${shortQuery} — ${timestamp}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -3275,7 +3284,18 @@ function openReport(printNow) {
 
 <div class="no-print print-bar">
   <button class="print-btn" onclick="window.focus();setTimeout(function(){window.print();},300)">⬇ PDF Kaydet / Yazdır</button>
-  <button class="print-btn" style="background:#007AFF;" onclick="if(navigator.share){navigator.share({title:document.title,text:document.body.innerText}).catch(function(){});}else{alert('Paylaşım bu tarayıcıda desteklenmiyor.');}">📤 Paylaş / AirDrop</button>
+  <button class="print-btn" style="background:#007AFF;" onclick="(function(){
+    var html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+    var blob = new Blob([html], {type:'text/html'});
+    var fname = document.title.replace(/[^a-zA-Z0-9_\-\.]/g,'_').substring(0,60)+'.html';
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[new File([blob],fname,{type:'text/html'})]})){
+      navigator.share({files:[new File([blob],fname,{type:'text/html'})],title:document.title}).catch(function(){});
+    } else if(navigator.share){
+      navigator.share({title:document.title,text:document.body.innerText.substring(0,2000)}).catch(function(){});
+    } else {
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();
+    }
+  })()">📤 Share / AirDrop</button>
   <button class="close-btn" onclick="window.close()">✕ Kapat</button>
 </div>
 
@@ -3288,6 +3308,7 @@ function openReport(printNow) {
     <div><strong>OPERATIONAL ASSESSMENT</strong></div>
     <div>${timestamp || new Date().toISOString().substring(0,16).replace('T',' ')}Z</div>
     ${reg ? '<div>REG: <strong>' + reg + '</strong></div>' : ''}
+    ${msn ? '<div>MSN: <strong>' + msn + '</strong></div>' : ''}
   </div>
 </div>
 <div class="report-stripe"></div>
