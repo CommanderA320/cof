@@ -540,23 +540,6 @@ function _ls(action, key, val) {
   } catch(e) { return null; }
 }
 function _loadData(cb) {
-  // On every startup: evict any doc cache entry that has no SHA (legacy/unversioned)
-  // This runs once per device, then SHA-tracked entries are used going forward
-  try{
-    var _allKeys = [];
-    for(var _ki=0; _ki<localStorage.length; _ki++) _allKeys.push(localStorage.key(_ki));
-    _allKeys.forEach(function(k){
-      if(k && k.indexOf('doc_text_') === 0){
-        var _code = k.replace('doc_text_','');
-        var _sha = localStorage.getItem('doc_sha_'+_code) || '';
-        if(!_sha){
-          localStorage.removeItem(k);
-          delete _docCache[_code];
-        }
-      }
-    });
-  }catch(e){}
-
   // Set fallback from EMBEDDED_DATA
   DATA = EMBEDDED_DATA.map(function(x){return JSON.parse(JSON.stringify(x));});
   _DEFAULT_DATA = JSON.stringify(DATA);
@@ -586,15 +569,15 @@ function _loadData(cb) {
       _ls('set','cof_data_v2',JSON.stringify({phases:DATA}));
       try{ ap=0; xi=null; bi=null; render(); } catch(e){}
     }
-    // Doc version sync
+    // Doc version sync: compare local size against authoritative size in data.json
     try{
       var remoteVers = d.doc_versions || {};
-      var needsSync = false;
-      // Evict docs whose ts differs from remote
       Object.keys(remoteVers).forEach(function(code){
-        var rv = remoteVers[code];
-        var localTs = parseInt(localStorage.getItem('doc_ts_'+code)||'0');
-        if(rv.ts && localTs !== rv.ts){
+        var rv = remoteVers[code]; // {size, ts}
+        if(!rv || !rv.size) return;
+        var localTxt = localStorage.getItem('doc_text_'+code) || '';
+        // Evict if local size differs from GitHub size by more than 1%
+        if(localTxt.length > 100 && Math.abs(localTxt.length - rv.size) > rv.size * 0.01){
           localStorage.removeItem('doc_text_'+code);
           localStorage.removeItem('doc_sha_'+code);
           localStorage.removeItem('doc_filename_'+code);
@@ -602,17 +585,6 @@ function _loadData(cb) {
           delete _docCache[code];
         }
       });
-      // If data.json has no doc_versions yet, populate ts for all loaded docs and sync
-      if(!d.doc_versions && _ghToken()){
-        REFERENCES.forEach(function(r){
-          var txt = localStorage.getItem('doc_text_'+r.code)||'';
-          if(txt.length > 100 && !localStorage.getItem('doc_ts_'+r.code)){
-            localStorage.setItem('doc_ts_'+r.code, String(Date.now()));
-            needsSync = true;
-          }
-        });
-        if(needsSync) setTimeout(function(){ try{ syncToGitHub(true); }catch(e){} }, 1000);
-      }
     }catch(e){}
     if(cb) cb();
   })
@@ -664,13 +636,12 @@ function syncToGitHub(silent){
   var token = _ghToken();
   if(!token){ if(!silent) alert('GitHub token girilmemiş. Ayarlardan ekle.'); return; }
   var headers = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
-  // Build doc_versions map from localStorage timestamps
+  // Build doc_versions map: size = localStorage text length (authoritative)
   var _docVers = {};
   try{
     REFERENCES.forEach(function(r){
-      var ts = parseInt(localStorage.getItem('doc_ts_'+r.code)||'0');
-      var sz = (localStorage.getItem('doc_text_'+r.code)||'').length;
-      if(ts && sz > 100) _docVers[r.code] = {ts:ts, size:sz};
+      var txt = localStorage.getItem('doc_text_'+r.code) || (_docCache[r.code]||'');
+      if(txt.length > 100) _docVers[r.code] = {size: txt.length, ts: Date.now()};
     });
   }catch(e){}
   var dataStr = JSON.stringify({version:'1.0',phases:DATA,doc_versions:_docVers},null,2);
