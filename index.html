@@ -1522,6 +1522,28 @@ function _getOEBsForMSN(msn) {
 }
 
 // OEB62 FULL PROCEDURE — hardcoded for guaranteed retrieval
+var OEB61_PROCEDURE = [
+  '=== OEB61 — WHITE OEB — CAB PR EXCESS CAB ALT ===',
+  'ECAM ENTRY: CAB PR EXCESS CAB ALT',
+  'OEB COLOR: WHITE',
+  'APPLICABILITY: A320 family aircraft equipped with CPC 20791-13AC or older',
+  '',
+  'CRITICAL RULE: Apply CAB PR EXCESS CAB ALT ECAM procedure EVEN IF the CAB PRESS SD page',
+  'shows cabin altitude within NORMAL RANGE.',
+  '',
+  'ROOT CAUSE: Active CPC internal failure → displays erroneous cabin altitude (normal range)',
+  'while standby CPC detects the real abnormal altitude and triggers the alert.',
+  'Flight crew may not see the real cabin altitude on CAB PRESS — only active CPC value shown.',
+  '',
+  'PROCEDURE:',
+  'CAB PR EXCESS CAB ALT ECAM PROC......APPLY',
+  '(Do NOT disregard or delay — CAB PRESS display may be misleading)',
+  '',
+  'This OEB is the interrupt trigger for OEB62: if CAB PR EXCESS CAB ALT triggers',
+  'AT ANY TIME during OEB62 procedure → IMMEDIATELY apply CAB PR EXCESS CAB ALT ECAM PROC',
+  '=== END OEB61 ==='
+].join('\n');
+
 var OEB62_PROCEDURE = [
   '=== OEB62 — RED OEB — AIR ENG 1(2) BLEED FAULT or AIR ENG 1+2 BLEED FAULT ===',
   'ECAM ENTRY: AIR ENG 1(2) BLEED FAULT, or AIR ENG 1+2 BLEED FAULT',
@@ -1578,15 +1600,23 @@ function _getOEBContextForMSN(msn) {
     out += '--- RED OEB (' + red.length + ') ---\n';
     red.forEach(function(o){
       out += '[RED] ' + o.id + ': ' + o.title + '\n';
-      // Inject full OEB62 procedure if this is the bleed fault OEB
+      // Inject hardcoded procedures for known RED OEBs
       if(o.title && o.title.indexOf('BLEED AIR SUPPLY') > -1){
         out += OEB62_PROCEDURE + '\n';
+      }
+      if(o.title && (o.title.indexOf('OHDS') > -1 || o.title.indexOf('MATING CABLE') > -1)){
+        out += '[G1174] Maintenance OEB — no flight crew procedure. Physical check only.\n';
       }
     });
   }
   if(white.length){
     out += '--- WHITE OEB (' + white.length + ') ---\n';
-    white.slice(0,20).forEach(function(o){ out += '[WHITE] ' + o.id + ': ' + o.title + '\n'; });
+    white.slice(0,20).forEach(function(o){
+      out += '[WHITE] ' + o.id + ': ' + o.title + '\n';
+      if(o.title && o.title.indexOf('CAB PR EXCESS CAB ALT') > -1){
+        out += OEB61_PROCEDURE + '\n';
+      }
+    });
     if(white.length > 20) out += '...and ' + (white.length-20) + ' more WHITE OEBs.\n';
   }
   out += '=== END OEB DATABASE ===\n';
@@ -2085,12 +2115,27 @@ function _getMELContext(registration, query){
   var ataItemRe = /^\s*(\d{2}-\d{2}-\d{2}[A-Z]?)\s/;
 
   // Build index of ATA item blocks: [{ataNo, startLine, endLine}]
+  // Split on:
+  // (A) Parent items: 22-30-01 (no letter suffix)
+  // (B) Sub-items that have their OWN "Applicable to:" within next 5 lines (standalone ops procedures)
+  var parentItemRe = /^\s*(\d{2}-\d{2}-\d{2})([A-Z]?)\s/;
   var items = [];
   for(var i=0;i<lines.length;i++){
-    var m = ataItemRe.exec(lines[i]);
+    var m = parentItemRe.exec(lines[i]);
     if(m){
-      if(items.length) items[items.length-1].end = i-1;
-      items.push({ata:m[1], start:i, end:lines.length-1});
+      var ataFull = m[1] + m[2]; // e.g. "22-30-01" or "21-21-01A"
+      var isParent = !m[2]; // no letter suffix = parent
+      var isStandalone = false;
+      if(m[2]){
+        // Sub-item: standalone only if it has its own "Applicable to:" in next 5 lines
+        for(var j=i+1; j<Math.min(i+6, lines.length); j++){
+          if(/APPLICABLE\s+TO/i.test(lines[j])){ isStandalone = true; break; }
+        }
+      }
+      if(isParent || isStandalone){
+        if(items.length) items[items.length-1].end = i-1;
+        items.push({ata:ataFull, start:i, end:lines.length-1});
+      }
     }
   }
 
@@ -2099,8 +2144,20 @@ function _getMELContext(registration, query){
   items.forEach(function(item){
     var blockLines = lines.slice(item.start, Math.min(item.end+1, item.start+60));
     var blockText = blockLines.join('\n').toUpperCase();
+    // Collect "Applicable to:" line AND all continuation lines until next section
     var appLine = '';
-    blockLines.forEach(function(l){ if(/APPLICABLE\s+TO/i.test(l)) appLine += l.toUpperCase(); });
+    var inApplic = false;
+    blockLines.forEach(function(l){
+      var lu = l.toUpperCase();
+      if(/APPLICABLE\s+TO/i.test(l)){
+        inApplic = true;
+        appLine += lu + ' ';
+      } else if(inApplic){
+        // Stop at next section header (ATA number, repair interval, ident, etc.)
+        if(/^\s*(\d{2}-\d{2}|IDENT\.|REPAIR|NBR |PLACARD|===)/i.test(l)) inApplic = false;
+        else appLine += lu + ' ';
+      }
+    });
     var isAll = /APPLICABLE\s+TO:\s*ALL\b/i.test(appLine);
     var isReg = appLine.indexOf(reg) > -1;
     if(isAll || isReg){
@@ -2119,8 +2176,13 @@ function _getMELContext(registration, query){
       var t = item.text.toLowerCase();
       var score = 0;
       // ATA number match (highest priority)
+      // Match exact or parent (22-30-01A query → matches 22-30-01 parent block)
       var ataInQuery = query.match(/\b\d{2}-\d{2}-\d{2}[A-Z]?\b/g);
-      if(ataInQuery && ataInQuery.some(function(a){ return a===item.ata; })) score += 100;
+      if(ataInQuery && ataInQuery.some(function(a){
+        var aParent = a.replace(/[A-Z]$/,'');
+        var itemParent = item.ata.replace(/[A-Z]$/,'');
+        return a === item.ata || aParent === item.ata || a === itemParent || aParent === itemParent;
+      })) score += 100;
       qWords.forEach(function(w){ if(t.indexOf(w)>-1) score += 1; });
       item.score = score;
     });
