@@ -823,15 +823,11 @@ function _preloadDocs(onStatus, onDone){
       if(!remoteSHA) return; // not on GitHub yet — leave alone
       try{
         var localSHA = localStorage.getItem('doc_sha_'+code) || '';
-        if(localSHA && localSHA !== remoteSHA){
-          // Stale — evict so next step re-fetches
+        if(!localSHA || localSHA !== remoteSHA){
+          // No SHA or mismatch — evict and re-fetch fresh
           localStorage.removeItem('doc_text_'+code);
           localStorage.removeItem('doc_sha_'+code);
           delete _docCache[code];
-        } else if(!localSHA) {
-          // No SHA stored yet — store it now if we have cached text
-          var cached = localStorage.getItem('doc_text_'+code) || '';
-          if(cached.length > 100) localStorage.setItem('doc_sha_'+code, remoteSHA);
         }
       }catch(e){}
     });
