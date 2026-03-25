@@ -713,31 +713,6 @@ function _ghDocsPath(docCode){
 }
 
 // Save doc text to GitHub docs/ folder
-// Write/update docs/docs_version.json on GitHub: {docCode:{size,ts},...}
-function _updateDocsVersionOnGitHub(docCode, vTag, cb){
-  var token = _ghToken();
-  if(!token){ cb&&cb(); return; }
-  var url = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/docs_version.json';
-  var hdr = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
-  fetch(url, {headers:hdr, cache:'no-store'})
-  .then(function(r){ return r.ok ? r.json() : null; })
-  .then(function(existing){
-    var current = {};
-    if(existing && existing.content){
-      try{ current = JSON.parse(atob(existing.content.replace(/\n/g,''))); }catch(e){}
-    }
-    current[docCode] = vTag;
-    var encoded;
-    try{ encoded = btoa(unescape(encodeURIComponent(JSON.stringify(current)))); }
-    catch(e){ encoded = btoa(JSON.stringify(current)); }
-    var body = {message:'versions: update '+docCode, content:encoded, branch:GITHUB_BRANCH};
-    if(existing && existing.sha) body.sha = existing.sha;
-    return fetch(url, {method:'PUT', headers:hdr, body:JSON.stringify(body)});
-  })
-  .then(function(){ cb&&cb(); })
-  .catch(function(){ cb&&cb(); });
-}
-
 function _saveDocToGitHub(docCode, text, cb){
   var token = _ghToken();
   if(!token){ cb && cb(new Error('No GitHub token')); return; }
@@ -758,11 +733,6 @@ function _saveDocToGitHub(docCode, text, cb){
   .then(function(r){
     if(r.ok){
       _docCache[docCode] = text;
-      // Tag localStorage with version so other devices detect stale cache
-      var vTag = {size: text.length, ts: Date.now()};
-      try{ localStorage.setItem('doc_ver_'+docCode, JSON.stringify(vTag)); }catch(e){}
-      // Update docs_version.json on GitHub silently
-      _updateDocsVersionOnGitHub(docCode, vTag, function(){});
       cb && cb(null);
     } else {
       return r.json().then(function(e){ cb && cb(new Error(e.message||'GitHub write error')); });
@@ -803,8 +773,6 @@ function _loadDocFromGitHub(docCode, cb){
         if(_n > 0) setTimeout(_updateRegBadge, 50);
       }
     }catch(e){}
-    // Update docs_version.json so all devices know the current size
-    try{ _updateDocsVersionOnGitHub(docCode, {size: t.length, ts: Date.now()}, function(){}); }catch(e){}
     cb && cb(null, t);
   })
   .catch(function(e){ cb && cb(e, ''); });
@@ -830,33 +798,32 @@ function _docAvailable(docCode){
 var _preloadDone = false;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
-  // Step 1: fetch docs_version.json from GitHub to detect stale localStorage caches
-  var verUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/docs_version.json';
-  var verHdr = {'Accept':'application/vnd.github.v3.raw'};
-  var token = _ghToken();
-  if(token) verHdr['Authorization'] = 'token '+token;
-  fetch(verUrl, {headers:verHdr, cache:'no-store'})
-  .then(function(r){ return r.ok ? r.text() : null; })
+  // Step 1: fetch GitHub docs/ directory listing (no token needed — public repo)
+  // This gives us the authoritative file size for each doc on GitHub
+  var dirUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/';
+  fetch(dirUrl, {headers:{'Accept':'application/vnd.github.v3+json'}, cache:'no-store'})
+  .then(function(r){ return r.ok ? r.json() : null; })
   .catch(function(){ return null; })
-  .then(function(verText){
-    var remoteVer = null;
-    try{ if(verText) remoteVer = JSON.parse(verText); }catch(e){}
-    // Evict stale localStorage entries where size differs from GitHub version
-    if(remoteVer && typeof remoteVer === 'object'){
-      codes.forEach(function(code){
-        var rv = remoteVer[code];
-        if(!rv) return;
-        try{
-          var localTag = JSON.parse(localStorage.getItem('doc_ver_'+code)||'null');
-          var localSize = localTag ? localTag.size : 0;
-          if(localSize !== rv.size){
-            localStorage.removeItem('doc_text_'+code);
-            localStorage.removeItem('doc_ver_'+code);
-            delete _docCache[code];
-          }
-        }catch(e){}
-      });
+  .then(function(dirListing){
+    // Build a map: filename → github size (bytes)
+    var ghSizes = {};
+    if(Array.isArray(dirListing)){
+      dirListing.forEach(function(f){ ghSizes[f.name] = f.size; });
     }
+    // Evict localStorage cache where size differs from GitHub
+    codes.forEach(function(code){
+      var fname = _ghDocsPath(code).split('/').pop(); // e.g. "QRH.txt"
+      var ghSize = ghSizes[fname];
+      if(!ghSize) return; // doc not on GitHub yet — leave cache alone
+      try{
+        var cached = localStorage.getItem('doc_text_'+code) || '';
+        // Allow 2% tolerance for encoding differences
+        if(cached.length > 100 && Math.abs(cached.length - ghSize) > ghSize * 0.02){
+          localStorage.removeItem('doc_text_'+code);
+          delete _docCache[code];
+        }
+      }catch(e){}
+    });
     // Step 2: normal load loop
     var i = 0;
     function next(){
