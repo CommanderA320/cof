@@ -733,7 +733,14 @@ function _saveDocToGitHub(docCode, text, cb){
   .then(function(r){
     if(r.ok){
       _docCache[docCode] = text;
-      cb && cb(null);
+      // Store SHA from response so cache invalidation works without re-fetching
+      return r.json().then(function(resp){
+        try{
+          var sha = resp && resp.content && resp.content.sha ? resp.content.sha : '';
+          if(sha) localStorage.setItem('doc_sha_'+docCode, sha);
+        }catch(e){}
+        cb && cb(null);
+      });
     } else {
       return r.json().then(function(e){ cb && cb(new Error(e.message||'GitHub write error')); });
     }
@@ -750,30 +757,35 @@ function _loadDocFromGitHub(docCode, cb){
   var headers = token
     ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3.raw'}
     : {'Accept':'application/vnd.github.v3.raw'};
-  fetch(url, {headers:headers, cache:'no-store'})
-  .then(function(r){ if(r.ok) return r.text(); throw new Error('404'); })
-  .then(function(t){
-    _docCache[docCode]=t;
-    // Persist to localStorage so next session skips GitHub fetch
+  // Fetch via API to get SHA alongside content
+  var apiUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path;
+  var apiHeaders = token
+    ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+    : {'Accept':'application/vnd.github.v3+json'};
+  fetch(apiUrl, {headers:apiHeaders, cache:'no-store'})
+  .then(function(r){ if(r.ok) return r.json(); throw new Error('404'); })
+  .then(function(meta){
+    // meta.content is base64, meta.sha is the blob SHA
+    var t;
+    try{ t = decodeURIComponent(escape(atob(meta.content.replace(/\n/g,'')))); }
+    catch(e){ t = atob(meta.content.replace(/\n/g,'')); }
+    var sha = meta.sha || '';
+    _docCache[docCode] = t;
     try{
       var key = 'doc_text_'+docCode;
-      // Only store if under 4MB (localStorage limit safety)
-      if(t.length < 4000000) {
+      if(t.length < 4000000){
         localStorage.setItem(key, t);
-        // Verify it was saved
-        if(!localStorage.getItem(key)) {
-          sessionStorage.setItem(key, t);
-        }
+        if(!localStorage.getItem(key)) sessionStorage.setItem(key, t);
       }
+      if(sha) localStorage.setItem('doc_sha_'+docCode, sha);
     }catch(e){ try{ sessionStorage.setItem('doc_text_'+docCode, t); }catch(e2){} }
-    // Parse MSN allocation table if this doc contains one
     try{
       if(t.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i) > -1){
         var _n = _parseMSNAllocationTable(t);
         if(_n > 0) setTimeout(_updateRegBadge, 50);
       }
     }catch(e){}
-    cb && cb(null, t);
+    cb && cb(null, t, sha);
   })
   .catch(function(e){ cb && cb(e, ''); });
 }
@@ -798,29 +810,33 @@ function _docAvailable(docCode){
 var _preloadDone = false;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
-  // Step 1: fetch GitHub docs/ directory listing (no token needed — public repo)
-  // This gives us the authoritative file size for each doc on GitHub
+  // Step 1: fetch GitHub docs/ directory listing — get SHA per file (no token needed)
   var dirUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/';
   fetch(dirUrl, {headers:{'Accept':'application/vnd.github.v3+json'}, cache:'no-store'})
   .then(function(r){ return r.ok ? r.json() : null; })
   .catch(function(){ return null; })
   .then(function(dirListing){
-    // Build a map: filename → github size (bytes)
-    var ghSizes = {};
+    // Build map: filename → sha
+    var ghSHA = {};
     if(Array.isArray(dirListing)){
-      dirListing.forEach(function(f){ ghSizes[f.name] = f.size; });
+      dirListing.forEach(function(f){ ghSHA[f.name] = f.sha; });
     }
-    // Evict localStorage cache where size differs from GitHub
+    // Evict localStorage where SHA differs from GitHub
     codes.forEach(function(code){
-      var fname = _ghDocsPath(code).split('/').pop(); // e.g. "QRH.txt"
-      var ghSize = ghSizes[fname];
-      if(!ghSize) return; // doc not on GitHub yet — leave cache alone
+      var fname = _ghDocsPath(code).split('/').pop();
+      var remoteSHA = ghSHA[fname];
+      if(!remoteSHA) return; // not on GitHub yet — leave alone
       try{
-        var cached = localStorage.getItem('doc_text_'+code) || '';
-        // Allow 2% tolerance for encoding differences
-        if(cached.length > 100 && Math.abs(cached.length - ghSize) > ghSize * 0.02){
+        var localSHA = localStorage.getItem('doc_sha_'+code) || '';
+        if(localSHA && localSHA !== remoteSHA){
+          // Stale — evict so next step re-fetches
           localStorage.removeItem('doc_text_'+code);
+          localStorage.removeItem('doc_sha_'+code);
           delete _docCache[code];
+        } else if(!localSHA) {
+          // No SHA stored yet — store it now if we have cached text
+          var cached = localStorage.getItem('doc_text_'+code) || '';
+          if(cached.length > 100) localStorage.setItem('doc_sha_'+code, remoteSHA);
         }
       }catch(e){}
     });
@@ -840,8 +856,11 @@ function _preloadDocs(onStatus, onDone){
         }
       }catch(e){}
       onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
-      _loadDocFromGitHub(code, function(err, text){
-        if(!err && text && text.length > 100) _docCache[code] = text;
+      _loadDocFromGitHub(code, function(err, text, sha){
+        if(!err && text && text.length > 100){
+          _docCache[code] = text;
+          if(sha) try{ localStorage.setItem('doc_sha_'+code, sha); }catch(e){}
+        }
         setTimeout(next, 80);
       });
     }
