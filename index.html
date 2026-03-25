@@ -805,33 +805,47 @@ function _docAvailable(docCode){
 var _preloadDone = false;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
-  // Step 1: fetch GitHub docs/ directory listing — get SHA per file (no token needed)
+
+  // Evict any cached doc that has no SHA — these are pre-SHA legacy entries.
+  // They will be re-fetched and get a SHA stored, so this only triggers once per device.
+  codes.forEach(function(code){
+    try{
+      var cached = localStorage.getItem('doc_text_'+code) || '';
+      var sha = localStorage.getItem('doc_sha_'+code) || '';
+      if(cached.length > 100 && !sha){
+        localStorage.removeItem('doc_text_'+code);
+        delete _docCache[code];
+      }
+    }catch(e){}
+  });
+
+  // Fetch GitHub docs/ directory listing for SHA comparison (no token needed)
   var dirUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/';
-  fetch(dirUrl, {headers:{'Accept':'application/vnd.github.v3+json'}, cache:'no-store'})
+  var dirHdr = {'Accept':'application/vnd.github.v3+json'};
+  var tok = _ghToken(); if(tok) dirHdr['Authorization'] = 'token '+tok;
+  fetch(dirUrl, {headers:dirHdr, cache:'no-store'})
   .then(function(r){ return r.ok ? r.json() : null; })
   .catch(function(){ return null; })
   .then(function(dirListing){
-    // Build map: filename → sha
     var ghSHA = {};
     if(Array.isArray(dirListing)){
       dirListing.forEach(function(f){ ghSHA[f.name] = f.sha; });
     }
-    // Evict localStorage where SHA differs from GitHub
+    // Evict where local SHA != GitHub SHA
     codes.forEach(function(code){
       var fname = _ghDocsPath(code).split('/').pop();
       var remoteSHA = ghSHA[fname];
-      if(!remoteSHA) return; // not on GitHub yet — leave alone
+      if(!remoteSHA) return;
       try{
         var localSHA = localStorage.getItem('doc_sha_'+code) || '';
-        if(!localSHA || localSHA !== remoteSHA){
-          // No SHA or mismatch — evict and re-fetch fresh
+        if(localSHA && localSHA !== remoteSHA){
           localStorage.removeItem('doc_text_'+code);
           localStorage.removeItem('doc_sha_'+code);
           delete _docCache[code];
         }
       }catch(e){}
     });
-    // Step 2: normal load loop
+    // Load loop
     var i = 0;
     function next(){
       if(i >= codes.length){ _preloadDone = true; onDone && onDone(); return; }
@@ -847,13 +861,12 @@ function _preloadDocs(onStatus, onDone){
         }
       }catch(e){}
       onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
-      // Capture sha from dirListing for this code before async call
       var _fname = _ghDocsPath(code).split('/').pop();
       var _sha = ghSHA[_fname] || '';
       var _code = code;
       _loadDocFromGitHub(_code, function(err, text){
-        if(!err && text && text.length > 100){
-          if(_sha) try{ localStorage.setItem('doc_sha_'+_code, _sha); }catch(e){}
+        if(!err && text && text.length > 100 && _sha){
+          try{ localStorage.setItem('doc_sha_'+_code, _sha); }catch(e){}
         }
         setTimeout(next, 80);
       });
