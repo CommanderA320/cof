@@ -540,6 +540,23 @@ function _ls(action, key, val) {
   } catch(e) { return null; }
 }
 function _loadData(cb) {
+  // On every startup: evict any doc cache entry that has no SHA (legacy/unversioned)
+  // This runs once per device, then SHA-tracked entries are used going forward
+  try{
+    var _allKeys = [];
+    for(var _ki=0; _ki<localStorage.length; _ki++) _allKeys.push(localStorage.key(_ki));
+    _allKeys.forEach(function(k){
+      if(k && k.indexOf('doc_text_') === 0){
+        var _code = k.replace('doc_text_','');
+        var _sha = localStorage.getItem('doc_sha_'+_code) || '';
+        if(!_sha){
+          localStorage.removeItem(k);
+          delete _docCache[_code];
+        }
+      }
+    });
+  }catch(e){}
+
   // Set fallback from EMBEDDED_DATA
   DATA = EMBEDDED_DATA.map(function(x){return JSON.parse(JSON.stringify(x));});
   _DEFAULT_DATA = JSON.stringify(DATA);
