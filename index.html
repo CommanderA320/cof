@@ -803,6 +803,8 @@ function _loadDocFromGitHub(docCode, cb){
         if(_n > 0) setTimeout(_updateRegBadge, 50);
       }
     }catch(e){}
+    // Update docs_version.json so all devices know the current size
+    try{ _updateDocsVersionOnGitHub(docCode, {size: t.length, ts: Date.now()}, function(){}); }catch(e){}
     cb && cb(null, t);
   })
   .catch(function(e){ cb && cb(e, ''); });
