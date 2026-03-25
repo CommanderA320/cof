@@ -584,9 +584,23 @@ function _loadData(cb) {
     if(Array.isArray(arr) && arr.length > 0){
       DATA = arr;
       _ls('set','cof_data_v2',JSON.stringify({phases:DATA}));
-      // Re-render UI with fresh server data
       try{ ap=0; xi=null; bi=null; render(); } catch(e){}
     }
+    // Doc version sync: evict stale localStorage caches
+    try{
+      var remoteVers = d.doc_versions || {};
+      Object.keys(remoteVers).forEach(function(code){
+        var rv = remoteVers[code]; // {size, ts}
+        var localTs = parseInt(localStorage.getItem('doc_ts_'+code)||'0');
+        if(rv.ts && localTs !== rv.ts){
+          localStorage.removeItem('doc_text_'+code);
+          localStorage.removeItem('doc_sha_'+code);
+          localStorage.removeItem('doc_filename_'+code);
+          localStorage.removeItem('doc_ts_'+code);
+          delete _docCache[code];
+        }
+      });
+    }catch(e){}
     if(cb) cb();
   })
   .catch(function(){
@@ -637,7 +651,16 @@ function syncToGitHub(silent){
   var token = _ghToken();
   if(!token){ if(!silent) alert('GitHub token girilmemiş. Ayarlardan ekle.'); return; }
   var headers = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
-  var dataStr = JSON.stringify({version:'1.0',phases:DATA},null,2);
+  // Build doc_versions map from localStorage timestamps
+  var _docVers = {};
+  try{
+    REFERENCES.forEach(function(r){
+      var ts = parseInt(localStorage.getItem('doc_ts_'+r.code)||'0');
+      var sz = (localStorage.getItem('doc_text_'+r.code)||'').length;
+      if(ts && sz > 100) _docVers[r.code] = {ts:ts, size:sz};
+    });
+  }catch(e){}
+  var dataStr = JSON.stringify({version:'1.0',phases:DATA,doc_versions:_docVers},null,2);
   var encoded = btoa(unescape(encodeURIComponent(dataStr)));
   var apiBase = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+GITHUB_FILE;
   _showSyncBadge('🔄 Sync...',true);
@@ -753,9 +776,13 @@ function _saveDocToGitHub(docCode, text, cb){
       // Store SHA from response so cache invalidation works without re-fetching
       return r.json().then(function(resp){
         try{
-          // GitHub PUT response: resp.content.sha is the new blob sha
           var sha = (resp && resp.content) ? resp.content.sha : '';
           if(sha) localStorage.setItem('doc_sha_'+docCode, sha);
+          // Store timestamp — this will be written to data.json on next sync
+          var ts = Date.now();
+          localStorage.setItem('doc_ts_'+docCode, String(ts));
+          // Trigger data.json sync so other devices see the new version immediately
+          setTimeout(function(){ try{ syncToGitHub(true); }catch(e){} }, 500);
         }catch(e){}
         cb && cb(null);
       });
