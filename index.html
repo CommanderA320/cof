@@ -713,6 +713,31 @@ function _ghDocsPath(docCode){
 }
 
 // Save doc text to GitHub docs/ folder
+// Write/update docs/docs_version.json on GitHub: {docCode:{size,ts},...}
+function _updateDocsVersionOnGitHub(docCode, vTag, cb){
+  var token = _ghToken();
+  if(!token){ cb&&cb(); return; }
+  var url = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/docs_version.json';
+  var hdr = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  fetch(url, {headers:hdr, cache:'no-store'})
+  .then(function(r){ return r.ok ? r.json() : null; })
+  .then(function(existing){
+    var current = {};
+    if(existing && existing.content){
+      try{ current = JSON.parse(atob(existing.content.replace(/\n/g,''))); }catch(e){}
+    }
+    current[docCode] = vTag;
+    var encoded;
+    try{ encoded = btoa(unescape(encodeURIComponent(JSON.stringify(current)))); }
+    catch(e){ encoded = btoa(JSON.stringify(current)); }
+    var body = {message:'versions: update '+docCode, content:encoded, branch:GITHUB_BRANCH};
+    if(existing && existing.sha) body.sha = existing.sha;
+    return fetch(url, {method:'PUT', headers:hdr, body:JSON.stringify(body)});
+  })
+  .then(function(){ cb&&cb(); })
+  .catch(function(){ cb&&cb(); });
+}
+
 function _saveDocToGitHub(docCode, text, cb){
   var token = _ghToken();
   if(!token){ cb && cb(new Error('No GitHub token')); return; }
@@ -723,7 +748,6 @@ function _saveDocToGitHub(docCode, text, cb){
   fetch(url, {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}, cache:'no-store'})
   .then(function(r){ return r.ok ? r.json() : null; })
   .then(function(existing){
-    // GitHub API requires base64. Use chunked approach for large text
     var encoded;
     try { encoded = btoa(unescape(encodeURIComponent(text))); }
     catch(e) { encoded = btoa(text.replace(/[^\x00-\x7F]/g,'?')); }
@@ -732,8 +756,17 @@ function _saveDocToGitHub(docCode, text, cb){
     return fetch(url, {method:'PUT', headers:headers, body:JSON.stringify(body)});
   })
   .then(function(r){
-    if(r.ok){ _docCache[docCode] = text; cb && cb(null); }
-    else return r.json().then(function(e){ cb && cb(new Error(e.message||'GitHub write error')); });
+    if(r.ok){
+      _docCache[docCode] = text;
+      // Tag localStorage with version so other devices detect stale cache
+      var vTag = {size: text.length, ts: Date.now()};
+      try{ localStorage.setItem('doc_ver_'+docCode, JSON.stringify(vTag)); }catch(e){}
+      // Update docs_version.json on GitHub silently
+      _updateDocsVersionOnGitHub(docCode, vTag, function(){});
+      cb && cb(null);
+    } else {
+      return r.json().then(function(e){ cb && cb(new Error(e.message||'GitHub write error')); });
+    }
   })
   .catch(function(e){ cb && cb(e); });
 }
@@ -795,28 +828,56 @@ function _docAvailable(docCode){
 var _preloadDone = false;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
-  var i = 0;
-  function next(){
-    if(i >= codes.length){ _preloadDone = true; onDone && onDone(); return; }
-    var code = codes[i++];
-    if(_docCache[code]){ next(); return; }
-    // Check localStorage first — skip GitHub fetch if already cached
-    try{
-      var cached = localStorage.getItem('doc_text_'+code) || sessionStorage.getItem('doc_text_'+code) || '';
-      if(cached.length > 100){
-        _docCache[code] = cached;
-        onStatus && onStatus('✅ Önbellekten: '+code+' ('+i+'/'+codes.length+')');
-        setTimeout(next, 10);
-        return;
-      }
-    }catch(e){}
-    onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
-    _loadDocFromGitHub(code, function(err, text){
-      if(!err && text && text.length > 100) _docCache[code] = text;
-      setTimeout(next, 80);
-    });
-  }
-  next();
+  // Step 1: fetch docs_version.json from GitHub to detect stale localStorage caches
+  var verUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/docs_version.json';
+  var verHdr = {'Accept':'application/vnd.github.v3.raw'};
+  var token = _ghToken();
+  if(token) verHdr['Authorization'] = 'token '+token;
+  fetch(verUrl, {headers:verHdr, cache:'no-store'})
+  .then(function(r){ return r.ok ? r.text() : null; })
+  .catch(function(){ return null; })
+  .then(function(verText){
+    var remoteVer = null;
+    try{ if(verText) remoteVer = JSON.parse(verText); }catch(e){}
+    // Evict stale localStorage entries where size differs from GitHub version
+    if(remoteVer && typeof remoteVer === 'object'){
+      codes.forEach(function(code){
+        var rv = remoteVer[code];
+        if(!rv) return;
+        try{
+          var localTag = JSON.parse(localStorage.getItem('doc_ver_'+code)||'null');
+          var localSize = localTag ? localTag.size : 0;
+          if(localSize !== rv.size){
+            localStorage.removeItem('doc_text_'+code);
+            localStorage.removeItem('doc_ver_'+code);
+            delete _docCache[code];
+          }
+        }catch(e){}
+      });
+    }
+    // Step 2: normal load loop
+    var i = 0;
+    function next(){
+      if(i >= codes.length){ _preloadDone = true; onDone && onDone(); return; }
+      var code = codes[i++];
+      if(_docCache[code]){ next(); return; }
+      try{
+        var cached = localStorage.getItem('doc_text_'+code) || sessionStorage.getItem('doc_text_'+code) || '';
+        if(cached.length > 100){
+          _docCache[code] = cached;
+          onStatus && onStatus('✅ Önbellekten: '+code+' ('+i+'/'+codes.length+')');
+          setTimeout(next, 10);
+          return;
+        }
+      }catch(e){}
+      onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
+      _loadDocFromGitHub(code, function(err, text){
+        if(!err && text && text.length > 100) _docCache[code] = text;
+        setTimeout(next, 80);
+      });
+    }
+    next();
+  });
 }
 
 function _renderDocManager(){
@@ -1277,10 +1338,13 @@ function _chunkDoc(docCode, docTitle, text){
   // Other docs: standard chunks (350 words)
   var isTechnique = (docCode === 'FCTM' || docCode === 'OM Part-B');
   var isQRH = (docCode === 'QRH');
-  var maxWords = isTechnique ? 120 : isQRH ? 150 : 350;
+  var isMEL = (docCode === 'MEL');
+  var maxWords = isTechnique ? 120 : isQRH ? 150 : isMEL ? 200 : 350;
 
-  // Split triggers — FCTM/OM Part-B get finer splits, others standard
-  var splitPattern = isTechnique
+  // Split triggers — MEL splits on ATA item boundaries
+  var splitPattern = isMEL
+    ? /\n(?=\s*\d{2}-\d{2}-\d{2}[A-Z]?\s)/
+    : isTechnique
     ? /\n{1,}|(?=\b(?:SHALL|MUST|WARNING|CAUTION|NOTE|PROCEDURE|ECAM|QRH|ACTION|IF |THEN |CHECK|STEP|CAPTAIN|COMMANDER|PF\b|PM\b|F\/O|CALLOUT|TECHNIQUE|BEFORE|AFTER|DURING|TAXI|TAKEOFF|LANDING|APPROACH|NORMAL PROC|ABNORMAL|EMERGENCY|BRAKE|HYDRAULIC|ELECTRICAL|FUEL|PRESSURI)\b)/i
     : /\n{2,}|(?=\b(?:SHALL|MUST|WARNING|CAUTION|NOTE|PROCEDURE|ECAM|QRH|ACTION|IF |THEN |CHECK|STEP)\b)/i;
 
@@ -1336,6 +1400,15 @@ function _bm25Score(chunk, queryTerms, aircraftMSN){
   if(isNormalQuery){
     if(chunk.doc === 'FCTM' || chunk.doc === 'OM Part-B') score *= 2.0;
     if(chunk.doc === 'FCOM' && /PRO-NOR|SOP|NORMAL|TAXI|BRAKE|CALLOUT|PF|PM/i.test(chunk.text)) score *= 1.8;
+  }
+  // MEL BOOST — direct ATA number hit or MEL keyword in query
+  if(chunk.doc === 'MEL'){
+    var melQuery = queryTerms.join(' ');
+    if(/\bmel\b/i.test(melQuery)) score *= 3.0;
+    var ataInQuery = melQuery.match(/\d{2}-\d{2}-\d{2}/);
+    if(ataInQuery && chunk.text.indexOf(ataInQuery[0]) > -1) score *= 5.0;
+    // Inoperative / dispatch keywords
+    if(/inoperative|inop|dispatch|deferred|deferral|repair interval/i.test(chunk.text)) score *= 1.5;
   }
   // OEB PROCEDURE BOOST — highest priority: OEB procedure pages in QRH
   // Matches: ECAM ENTRY, OEBPROC, X BLEED, RAM AIR (OEB-specific keywords)
@@ -1979,38 +2052,76 @@ function _msnMatchesApplicability(msnStr, applicability, modelStr) {
 }
 
 // ===== MEL REGISTRATION PARSER =====
-function _getMELContext(registration){
+function _getMELContext(registration, query){
   if(!registration) return '';
-  var melText='';
-  melText = _getDocText('MEL');
-  if(!melText) return '';
+  var melText = _getDocText('MEL');
+  if(!melText || melText.length < 100) return '';
 
   var reg = registration.toUpperCase().trim();
   var lines = melText.split('\n');
-  var result = [];
-  var inBlock = false;
-  var blockBuf = [];
-  var blockStart = -1;
+  var ataItemRe = /^\s*(\d{2}-\d{2}-\d{2}[A-Z]?)\s/;
 
+  // Build index of ATA item blocks: [{ataNo, startLine, endLine}]
+  var items = [];
   for(var i=0;i<lines.length;i++){
-    var line = lines[i];
-    var lineUp = line.toUpperCase();
-
-    // Check if line contains our registration
-    if(lineUp.indexOf(reg) > -1){
-      // Capture surrounding context (20 lines before + 30 after)
-      var s = Math.max(0, i-5);
-      var e = Math.min(lines.length-1, i+30);
-      var block = lines.slice(s,e).join('\n').trim();
-      // Avoid duplicates
-      if(result.indexOf(block)===-1) result.push(block);
-      i = e; // skip ahead
+    var m = ataItemRe.exec(lines[i]);
+    if(m){
+      if(items.length) items[items.length-1].end = i-1;
+      items.push({ata:m[1], start:i, end:lines.length-1});
     }
   }
 
-  if(!result.length) return '';
-  var melOut = result.join('\n---\n').substring(0, 800);
-  return '\n\n=== MEL: '+reg+' ===\n'+melOut;
+  // For each item, check applicability: reg in "Applicable to:" OR "ALL"
+  var applicable = [];
+  items.forEach(function(item){
+    var blockLines = lines.slice(item.start, Math.min(item.end+1, item.start+60));
+    var blockText = blockLines.join('\n').toUpperCase();
+    var appLine = '';
+    blockLines.forEach(function(l){ if(/APPLICABLE\s+TO/i.test(l)) appLine += l.toUpperCase(); });
+    var isAll = /APPLICABLE\s+TO:\s*ALL\b/i.test(appLine);
+    var isReg = appLine.indexOf(reg) > -1;
+    if(isAll || isReg){
+      // Full block text (up to 120 lines or next item)
+      var fullBlock = lines.slice(item.start, Math.min(item.end+1, item.start+120)).join('\n').trim();
+      applicable.push({ata:item.ata, text:fullBlock, isAll:isAll});
+    }
+  });
+
+  if(!applicable.length) return '';
+
+  // If query provided, score by relevance — otherwise return up to 3 items
+  if(query){
+    var qWords = query.toLowerCase().replace(/[^\w\s-]/g,' ').split(/\s+/).filter(function(w){ return w.length>2; });
+    applicable.forEach(function(item){
+      var t = item.text.toLowerCase();
+      var score = 0;
+      // ATA number match (highest priority)
+      var ataInQuery = query.match(/\b\d{2}-\d{2}-\d{2}[A-Z]?\b/g);
+      if(ataInQuery && ataInQuery.some(function(a){ return a===item.ata; })) score += 100;
+      qWords.forEach(function(w){ if(t.indexOf(w)>-1) score += 1; });
+      item.score = score;
+    });
+    applicable.sort(function(a,b){ return b.score - a.score; });
+    applicable = applicable.filter(function(i){ return i.score > 0; }).slice(0,4);
+  } else {
+    applicable = applicable.slice(0,3);
+  }
+
+  if(!applicable.length) return '';
+
+  var out = applicable.map(function(item){
+    // Trim each block to max 600 chars but keep whole lines
+    var t = item.text;
+    if(t.length > 600){
+      t = t.substring(0,600);
+      var lastNl = t.lastIndexOf('\n');
+      if(lastNl > 200) t = t.substring(0, lastNl);
+      t += '\n[...]';
+    }
+    return '[MEL '+item.ata+(item.isAll?' — ALL':'')+']\n'+t;
+  }).join('\n---\n');
+
+  return '\n\n=== MEL ('+reg+') ===\n'+out;
 }
 
 // Build dynamic context tags for UI
@@ -3527,7 +3638,7 @@ function sendQuery() {
   }
   var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
   try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
-  try { melContext = _getMELContext(registration); } catch(e) { console.error('MEL error:', e); }
+  try { melContext = _getMELContext(registration, input); } catch(e) { console.error('MEL error:', e); }
 
   var systemMsg = (_aiMode === "procedure") ? AI_PROC_SYSTEM : AI_SYSTEM;
   // Context goes in user message, not system (saves tokens)
