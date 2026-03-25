@@ -736,7 +736,8 @@ function _saveDocToGitHub(docCode, text, cb){
       // Store SHA from response so cache invalidation works without re-fetching
       return r.json().then(function(resp){
         try{
-          var sha = resp && resp.content && resp.content.sha ? resp.content.sha : '';
+          // GitHub PUT response: resp.content.sha is the new blob sha
+          var sha = (resp && resp.content) ? resp.content.sha : '';
           if(sha) localStorage.setItem('doc_sha_'+docCode, sha);
         }catch(e){}
         cb && cb(null);
@@ -757,19 +758,14 @@ function _loadDocFromGitHub(docCode, cb){
   var headers = token
     ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3.raw'}
     : {'Accept':'application/vnd.github.v3.raw'};
-  // Fetch via API to get SHA alongside content
-  var apiUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path;
-  var apiHeaders = token
-    ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
-    : {'Accept':'application/vnd.github.v3+json'};
-  fetch(apiUrl, {headers:apiHeaders, cache:'no-store'})
-  .then(function(r){ if(r.ok) return r.json(); throw new Error('404'); })
-  .then(function(meta){
-    // meta.content is base64, meta.sha is the blob SHA
-    var t;
-    try{ t = decodeURIComponent(escape(atob(meta.content.replace(/\n/g,'')))); }
-    catch(e){ t = atob(meta.content.replace(/\n/g,'')); }
-    var sha = meta.sha || '';
+  // Use raw API for content (handles large files, no base64 decode needed)
+  var rawUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/'+path;
+  var rawHeaders = token
+    ? {'Authorization':'token '+token,'Accept':'application/vnd.github.v3.raw'}
+    : {'Accept':'application/vnd.github.v3.raw'};
+  fetch(rawUrl, {headers:rawHeaders, cache:'no-store'})
+  .then(function(r){ if(r.ok) return r.text(); throw new Error('404'); })
+  .then(function(t){
     _docCache[docCode] = t;
     try{
       var key = 'doc_text_'+docCode;
@@ -777,7 +773,6 @@ function _loadDocFromGitHub(docCode, cb){
         localStorage.setItem(key, t);
         if(!localStorage.getItem(key)) sessionStorage.setItem(key, t);
       }
-      if(sha) localStorage.setItem('doc_sha_'+docCode, sha);
     }catch(e){ try{ sessionStorage.setItem('doc_text_'+docCode, t); }catch(e2){} }
     try{
       if(t.search(/AIRCRAFT\s+ALLOCATION\s+TABLE/i) > -1){
@@ -785,7 +780,7 @@ function _loadDocFromGitHub(docCode, cb){
         if(_n > 0) setTimeout(_updateRegBadge, 50);
       }
     }catch(e){}
-    cb && cb(null, t, sha);
+    cb && cb(null, t);
   })
   .catch(function(e){ cb && cb(e, ''); });
 }
@@ -856,10 +851,13 @@ function _preloadDocs(onStatus, onDone){
         }
       }catch(e){}
       onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
-      _loadDocFromGitHub(code, function(err, text, sha){
+      // Capture sha from dirListing for this code before async call
+      var _fname = _ghDocsPath(code).split('/').pop();
+      var _sha = ghSHA[_fname] || '';
+      var _code = code;
+      _loadDocFromGitHub(_code, function(err, text){
         if(!err && text && text.length > 100){
-          _docCache[code] = text;
-          if(sha) try{ localStorage.setItem('doc_sha_'+code, sha); }catch(e){}
+          if(_sha) try{ localStorage.setItem('doc_sha_'+_code, _sha); }catch(e){}
         }
         setTimeout(next, 80);
       });
