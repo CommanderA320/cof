@@ -586,11 +586,13 @@ function _loadData(cb) {
       _ls('set','cof_data_v2',JSON.stringify({phases:DATA}));
       try{ ap=0; xi=null; bi=null; render(); } catch(e){}
     }
-    // Doc version sync: evict stale localStorage caches
+    // Doc version sync
     try{
       var remoteVers = d.doc_versions || {};
+      var needsSync = false;
+      // Evict docs whose ts differs from remote
       Object.keys(remoteVers).forEach(function(code){
-        var rv = remoteVers[code]; // {size, ts}
+        var rv = remoteVers[code];
         var localTs = parseInt(localStorage.getItem('doc_ts_'+code)||'0');
         if(rv.ts && localTs !== rv.ts){
           localStorage.removeItem('doc_text_'+code);
@@ -600,6 +602,17 @@ function _loadData(cb) {
           delete _docCache[code];
         }
       });
+      // If data.json has no doc_versions yet, populate ts for all loaded docs and sync
+      if(!d.doc_versions && _ghToken()){
+        REFERENCES.forEach(function(r){
+          var txt = localStorage.getItem('doc_text_'+r.code)||'';
+          if(txt.length > 100 && !localStorage.getItem('doc_ts_'+r.code)){
+            localStorage.setItem('doc_ts_'+r.code, String(Date.now()));
+            needsSync = true;
+          }
+        });
+        if(needsSync) setTimeout(function(){ try{ syncToGitHub(true); }catch(e){} }, 1000);
+      }
     }catch(e){}
     if(cb) cb();
   })
