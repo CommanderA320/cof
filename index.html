@@ -3926,12 +3926,21 @@ async function sendQuery() {
     try {
       var extraTerms = await _getTargetedSearchTerms(input, melContext, apiKey);
       if(extraTerms && extraTerms.length){
+        // DEBUG: show which terms were generated
+        var debugEl = document.getElementById('ai-result-body');
+        if(debugEl) debugEl.innerHTML = '<div style="background:#1C1C1E;color:#34C759;font-family:monospace;font-size:10px;padding:8px;border-radius:6px;margin-bottom:8px;">'
+          + '🔍 TWO-STEP RETRIEVAL: ' + JSON.stringify(extraTerms) + '</div>';
         extraTerms.forEach(function(term){
           if(term && term.length > 3){
             var extraContext = _bm25Search(term, 5, msnData || null);
             if(extraContext) docContext += '\n\n=== ADDITIONAL (compound search: '+term+') ===\n' + extraContext;
           }
         });
+      } else {
+        // DEBUG: show empty result
+        var debugEl2 = document.getElementById('ai-result-body');
+        if(debugEl2) debugEl2.innerHTML = '<div style="background:#1C1C1E;color:#FF9500;font-family:monospace;font-size:10px;padding:8px;border-radius:6px;margin-bottom:8px;">'
+          + '⚠️ TWO-STEP RETRIEVAL: no extra terms generated</div>';
       }
     } catch(e) { console.error('Two-step retrieval error:', e); }
   }
