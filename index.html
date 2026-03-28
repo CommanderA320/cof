@@ -3480,6 +3480,10 @@ function formatResult(text) {
     return sep + '<strong>' + opt + '</strong>';
   });
 
+  // ── 6.5. CHECKLIST ITEMS — - [ ] → empty box, - [x] → green tick ─────────
+  text = text.replace(/^([ \t]*)- \[x\]/gm, '$1- <span style="color:#1A7A3A;font-weight:900;">\u2705</span>');
+  text = text.replace(/^([ \t]*)- \[ \]/gm, '$1- <span style="color:#8E8E93;">\u25a1</span>');
+
   // ── 7. MONOSPACE BLOCKS (```...```) ──────────────────────────────────────
   text = text.replace(/```[\w]*\n?([\s\S]*?)```/g, function(match, code){
     return '<div style="background:#1C1C1E;color:#E5E5EA;font-family:monospace;font-size:11px;line-height:1.6;padding:10px 12px;border-radius:8px;margin:8px 0;white-space:pre;overflow-x:auto;">'+code+'</div>';
@@ -3500,7 +3504,7 @@ function formatResult(text) {
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
         : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;';
-      html += '<tr>' + cells.map(function(c,ci){ var cs = style + (isFirst ? '' : (ci===0 ? 'min-width:100px;width:28%;' : '')); return '<'+tag+' style="'+cs+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
+      html += '<tr>' + cells.map(function(c,ci){ var cs = style + (isFirst ? '' : (ci===0 ? 'width:40px;min-width:40px;max-width:50px;' : '')); return '<'+tag+' style="'+cs+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
       isFirst = false;
     });
     html += '</table>';
