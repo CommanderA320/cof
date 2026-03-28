@@ -3489,7 +3489,7 @@ function formatResult(text) {
   text = text.replace(/((?:[ \t]*\|.+\|[ \t]*\n)+)/g, function(block){
     var rows = block.trim().split('\n').filter(function(r){ return r.trim(); });
     if(rows.length < 1) return block;
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;table-layout:fixed;word-break:break-word;">';
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;">';
     var isFirst = true;
     rows.forEach(function(row){
       // Skip separator rows: lines like |---|---|---| or |:---|:---:|
@@ -3499,7 +3499,7 @@ function formatResult(text) {
       var tag = isFirst ? 'th' : 'td';
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
-        : 'padding:3px 5px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;';
+        : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;';
       html += '<tr>' + cells.map(function(c){ return '<'+tag+' style="'+style+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
       isFirst = false;
     });
@@ -3530,6 +3530,15 @@ function formatResult(text) {
     }
     return match;
   });
+
+  // ── 9.7 APPLICABLE REGULATIONS section — wrap in system font div ──────────
+  // Wrap content between APPLICABLE REGULATIONS header and next section header
+  text = text.replace(
+    /(<SECTIONHDR>APPLICABLE REGULATIONS<\/SECTIONHDR>)(.*?)(?=<SECTIONHDR>|$)/s,
+    function(match, hdr, body) {
+      return hdr + '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Arial,sans-serif;font-size:12px;">' + body + '</div>';
+    }
+  );
 
   // ── 10. NEWLINE → <br> ───────────────────────────────────────────────────
   text = text.replace(/\n{2,}/g, '\n');
