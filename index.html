@@ -3500,7 +3500,7 @@ function formatResult(text) {
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
         : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;';
-      html += '<tr>' + cells.map(function(c){ return '<'+tag+' style="'+style+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
+      html += '<tr>' + cells.map(function(c,ci){ var cs = style + (isFirst ? '' : (ci===0 ? 'min-width:100px;width:28%;' : '')); return '<'+tag+' style="'+cs+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
       isFirst = false;
     });
     html += '</table>';
