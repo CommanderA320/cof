@@ -2239,12 +2239,12 @@ function _getMELContext(registration, query){
   if(!melText || melText.length < 100) return '';
 
   var reg = registration.toUpperCase().trim();
-  var lines = melText.split('\n');
+  var lines = melText.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
 
   // Build index of ATA item blocks
   // Split on EVERY ATA number — both parent (21-31-01) and sub-items (21-31-01A)
   // Each gets its own block. Applicability is searched in the block or inherited from parent.
-  var parentItemRe = /^\s*(\d{2}-\d{2}-\d{2})([A-Z]?)\s/;
+  var parentItemRe = /(\d{2}-\d{2}-\d{2})([A-Z]?)(?:\s|$)/;
   var items = [];
   for(var i=0;i<lines.length;i++){
     var m = parentItemRe.exec(lines[i]);
