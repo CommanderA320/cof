@@ -3922,8 +3922,11 @@ async function sendQuery() {
   try { melContext = _getMELContext(registration, input); } catch(e) { console.error('MEL error:', e); }
 
   // TWO-STEP RETRIEVAL: detect compound scenarios and add targeted searches
-  // Only run if MEL context exists (compound MEL+ECAM scenarios need this most)
+  // Show debug info always
+  var _dbg = document.getElementById('ai-two-step-debug');
+  if(_dbg){ _dbg.textContent = '🔍 MEL context len: '+(melContext?melContext.length:0)+' | mode: '+_aiMode; _dbg.style.display='block'; _dbg.style.color='#34C759'; }
   if(melContext && melContext.length > 100 && apiKey && _aiMode !== 'procedure'){
+    if(_dbg){ _dbg.textContent += ' | Running two-step...'; }
     try {
       var extraTerms = await _getTargetedSearchTerms(input, melContext, apiKey);
       if(extraTerms && extraTerms.length){
