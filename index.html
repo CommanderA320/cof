@@ -2199,17 +2199,38 @@ function _getMELContext(registration, query){
   if(!melText || melText.length < 100){
     // Scan all localStorage keys for MEL document
     try{
+      // Check _docCache first (memory)
+      var _cacheKeys = Object.keys(_docCache||{});
+      for(var ci=0;ci<_cacheKeys.length;ci++){
+        var ct = _docCache[_cacheKeys[ci]]||'';
+        if(ct.length>50000 && /\d{2}-\d{2}-\d{2}/.test(ct) &&
+           /APPLICABLE\s+TO|MEL ITEMS|REPAIR INTERVAL|Nbr installed/i.test(ct)){
+          melText = ct; _docCache['MEL']=ct; break;
+        }
+      }
+    }catch(e){}
+    // Check localStorage
+    if(!melText || melText.length<100) try{
       for(var ki=0; ki<localStorage.length; ki++){
         var lk = localStorage.key(ki);
         if(lk && lk.indexOf('doc_text_') === 0){
           var lt = localStorage.getItem(lk) || '';
-          // MEL docs contain ATA item patterns like 21-31-01
           if(lt.length > 50000 && /\d{2}-\d{2}-\d{2}/.test(lt) && 
              /APPLICABLE\s+TO|MEL ITEMS|REPAIR INTERVAL|Nbr installed/i.test(lt)){
-            melText = lt;
-            // Cache under correct key
-            _docCache['MEL'] = lt;
-            break;
+            melText = lt; _docCache['MEL'] = lt; break;
+          }
+        }
+      }
+    }catch(e){}
+    // Check sessionStorage
+    if(!melText || melText.length<100) try{
+      for(var si=0; si<sessionStorage.length; si++){
+        var sk = sessionStorage.key(si);
+        if(sk && sk.indexOf('doc_text_') === 0){
+          var st = sessionStorage.getItem(sk) || '';
+          if(st.length > 50000 && /\d{2}-\d{2}-\d{2}/.test(st) && 
+             /APPLICABLE\s+TO|MEL ITEMS|REPAIR INTERVAL|Nbr installed/i.test(st)){
+            melText = st; _docCache['MEL'] = st; break;
           }
         }
       }
