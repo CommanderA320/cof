@@ -451,6 +451,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
         <span class="ai-result-title">OPERATIONAL ASSESSMENT</span>
         <span id="ai-result-time" class="ai-result-time"></span>
       </div>
+      <div id="ai-two-step-debug" style="display:none;background:#1C1C1E;color:#34C759;font-family:monospace;font-size:10px;padding:6px 10px;border-radius:6px;margin:4px 12px;"></div>
       <div id="ai-result-body" class="ai-result-body"></div>
       <div id="ai-result-actions" style="display:none;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #F2F2F7;">
         <button onclick="openReport()" style="flex:1;background:#F2F2F7;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x1F4C4; Rapor</button>
@@ -3927,9 +3928,8 @@ async function sendQuery() {
       var extraTerms = await _getTargetedSearchTerms(input, melContext, apiKey);
       if(extraTerms && extraTerms.length){
         // DEBUG: show which terms were generated
-        var debugEl = document.getElementById('ai-result-body');
-        if(debugEl) debugEl.innerHTML = '<div style="background:#1C1C1E;color:#34C759;font-family:monospace;font-size:10px;padding:8px;border-radius:6px;margin-bottom:8px;">'
-          + '🔍 TWO-STEP RETRIEVAL: ' + JSON.stringify(extraTerms) + '</div>';
+        var debugEl = document.getElementById('ai-two-step-debug');
+        if(debugEl){ debugEl.textContent = '🔍 TWO-STEP: ' + JSON.stringify(extraTerms); debugEl.style.display='block'; }
         extraTerms.forEach(function(term){
           if(term && term.length > 3){
             var extraContext = _bm25Search(term, 5, msnData || null);
@@ -3938,9 +3938,8 @@ async function sendQuery() {
         });
       } else {
         // DEBUG: show empty result
-        var debugEl2 = document.getElementById('ai-result-body');
-        if(debugEl2) debugEl2.innerHTML = '<div style="background:#1C1C1E;color:#FF9500;font-family:monospace;font-size:10px;padding:8px;border-radius:6px;margin-bottom:8px;">'
-          + '⚠️ TWO-STEP RETRIEVAL: no extra terms generated</div>';
+        var debugEl2 = document.getElementById('ai-two-step-debug');
+        if(debugEl2){ debugEl2.textContent = '⚠️ TWO-STEP: no extra terms generated'; debugEl2.style.color='#FF9500'; debugEl2.style.display='block'; }
       }
     } catch(e) { console.error('Two-step retrieval error:', e); }
   }
