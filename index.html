@@ -2257,6 +2257,13 @@ function _getMELContext(registration, query){
     }
   }
 
+  // DEBUG: show parsing results
+  var _dbg2 = document.getElementById('ai-two-step-debug');
+  if(_dbg2){
+    var _first200 = melText.substring(0,300).replace(/\n/g,' | ');
+    _dbg2.textContent += ' | items:'+items.length+' | first:'+_first200;
+  }
+
   // Build parent applicability index for inheritance
   var parentApplic = {};
   items.forEach(function(item){
@@ -2268,7 +2275,7 @@ function _getMELContext(registration, query){
         var lu = l.toUpperCase();
         if(/APPLICABLE\s+TO/i.test(l)){ inApplic = true; appLine += lu + ' '; }
         else if(inApplic){
-          if(/^\s*(\d{2}-\d{2}|IDENT\.|REPAIR|NBR |PLACARD|===)/i.test(l)) inApplic = false;
+          if(/^\s*(\d{2}-\d{2}|REPAIR|NBR |PLACARD|===)/i.test(l)) inApplic = false;
           else appLine += lu + ' ';
         }
       });
@@ -2287,7 +2294,7 @@ function _getMELContext(registration, query){
       var lu = l.toUpperCase();
       if(/APPLICABLE\s+TO/i.test(l)){ inApplic = true; appLine += lu + ' '; }
       else if(inApplic){
-        if(/^\s*(\d{2}-\d{2}|IDENT\.|REPAIR|NBR |PLACARD|===)/i.test(l)) inApplic = false;
+        if(/^\s*(\d{2}-\d{2}|REPAIR|NBR |PLACARD|===)/i.test(l)) inApplic = false;
         else appLine += lu + ' ';
       }
     });
