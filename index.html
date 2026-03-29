@@ -204,7 +204,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #F2F2F7;}
 .ai-result-title{font-size:12px;font-weight:800;color:#1C1C1E;letter-spacing:0.5px;}
 .ai-result-time{font-size:10px;color:#34C759;font-family:monospace;font-weight:700;}
-.ai-result-body{font-size:13px;color:#1C1C1E;line-height:1.7;white-space:pre-wrap;}
+.ai-result-body{font-size:13px;color:#1C1C1E;line-height:1.7;white-space:pre-line;}
 .ai-result-body .risk-HIGH{color:#D70015;font-weight:800;}
 .ai-result-body .risk-MED{color:#B25000;font-weight:700;}
 .ai-result-body .risk-OK{color:#1A7A3A;font-weight:700;}
@@ -3989,7 +3989,7 @@ async function sendQuery() {
       if(extraTerms && extraTerms.length){
         // DEBUG: show which terms were generated
         var debugEl = document.getElementById('ai-two-step-debug');
-        if(debugEl){ debugEl.textContent = '🔍 TWO-STEP: ' + JSON.stringify(extraTerms); debugEl.style.display='block'; }
+        if(debugEl){ debugEl.textContent = '🔍 TWO-STEP: ' + JSON.stringify(extraTerms); debugEl.style.display='block'; window._twoStepTerms = extraTerms; }
         extraTerms.forEach(function(term){
           if(term && term.length > 3){
             var extraContext = _bm25Search(term, 5, msnData || null);
@@ -4006,7 +4006,7 @@ async function sendQuery() {
 
   var _dbg = document.getElementById('ai-two-step-debug');
   if(_dbg){ 
-    _dbg.textContent = '🔍 MEL raw:'+(_melRaw?_melRaw.length:0)+' | ctx:'+melContext.length+' | '+(window._melDebug||'')+' | cache('+_cacheCount+'):'+_cacheKeys+' | ls:'+_lsKeys.join(',');
+    _dbg.textContent = '🔍 MEL raw:'+(_melRaw?_melRaw.length:0)+' | ctx:'+melContext.length+' | '+(window._melDebug||'')+' | cache('+_cacheCount+'):'+_cacheKeys+' | extra:'+(window._twoStepTerms?JSON.stringify(window._twoStepTerms):'none')+' | ls:'+_lsKeys.join(',');
     _dbg.style.display='block'; _dbg.style.color='#34C759'; 
   }
 
