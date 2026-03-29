@@ -2257,12 +2257,8 @@ function _getMELContext(registration, query){
     }
   }
 
-  // DEBUG: show parsing results
-  var _dbg2 = document.getElementById('ai-two-step-debug');
-  if(_dbg2){
-    var _first200 = melText.substring(0,400).replace(/[\r\n]/g,' | ');
-    _dbg2.textContent += ' | items:'+items.length+' | txt:'+_first200;
-  }
+  // Store debug info globally
+  window._melDebug = 'items:'+items.length+' | txt:'+melText.substring(0,200).replace(/[\r\n]/g,' | ');
 
   // Build parent applicability index for inheritance
   var parentApplic = {};
@@ -3972,14 +3968,8 @@ async function sendQuery() {
   // TWO-STEP RETRIEVAL: detect compound scenarios and add targeted searches
   // Show debug info always
   var _melRaw = _getDocText('MEL');
-  // Scan localStorage keys for debug
   var _lsKeys = [];
   try{ for(var _ki=0;_ki<localStorage.length;_ki++){ var _lk=localStorage.key(_ki); if(_lk&&_lk.indexOf('doc_text_')===0) _lsKeys.push(_lk.replace('doc_text_','')+':'+((localStorage.getItem(_lk)||'').length)); } }catch(e){}
-  var _dbg = document.getElementById('ai-two-step-debug');
-  if(_dbg){ 
-    _dbg.textContent = '🔍 MEL raw: '+(_melRaw?_melRaw.length:0)+' | MEL ctx: '+(melContext?melContext.length:0)+' | localStorage docs: '+_lsKeys.join(', ');
-    _dbg.style.display='block'; _dbg.style.color='#34C759'; 
-  }
   if(melContext && melContext.length > 100 && apiKey && _aiMode !== 'procedure'){
     if(_dbg){ _dbg.textContent += ' | Running two-step...'; }
     try {
@@ -4002,7 +3992,13 @@ async function sendQuery() {
     } catch(e) { console.error('Two-step retrieval error:', e); }
   }
 
-  var systemMsg = (_aiMode === "procedure") ? AI_PROC_SYSTEM : AI_SYSTEM;
+  var _dbg = document.getElementById('ai-two-step-debug');
+  if(_dbg){ 
+    _dbg.textContent = '🔍 MEL raw:'+(_melRaw?_melRaw.length:0)+' | ctx:'+melContext.length+' | '+(window._melDebug||'no mel debug')+' | ls:'+_lsKeys.join(',');
+    _dbg.style.display='block'; _dbg.style.color='#34C759'; 
+  }
+
+    var systemMsg = (_aiMode === "procedure") ? AI_PROC_SYSTEM : AI_SYSTEM;
   // Context goes in user message, not system (saves tokens)
   var contextBlock = '';
   if(melContext || docContext){
