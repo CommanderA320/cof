@@ -3944,10 +3944,12 @@ async function sendQuery() {
   // TWO-STEP RETRIEVAL: detect compound scenarios and add targeted searches
   // Show debug info always
   var _melRaw = _getDocText('MEL');
+  // Scan localStorage keys for debug
+  var _lsKeys = [];
+  try{ for(var _ki=0;_ki<localStorage.length;_ki++){ var _lk=localStorage.key(_ki); if(_lk&&_lk.indexOf('doc_text_')===0) _lsKeys.push(_lk.replace('doc_text_','')+':'+((localStorage.getItem(_lk)||'').length)); } }catch(e){}
   var _dbg = document.getElementById('ai-two-step-debug');
   if(_dbg){ 
-    var _docKeys = Object.keys(_docCache||{}).join(', ');
-    _dbg.textContent = '🔍 MEL len: '+(_melRaw?_melRaw.length:0)+' | MEL ctx: '+(melContext?melContext.length:0)+' | docs: '+_docKeys;
+    _dbg.textContent = '🔍 MEL raw: '+(_melRaw?_melRaw.length:0)+' | MEL ctx: '+(melContext?melContext.length:0)+' | localStorage docs: '+_lsKeys.join(', ');
     _dbg.style.display='block'; _dbg.style.color='#34C759'; 
   }
   if(melContext && melContext.length > 100 && apiKey && _aiMode !== 'procedure'){
