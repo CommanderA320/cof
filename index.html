@@ -1744,6 +1744,13 @@ function _bm25MultiSearch(query, aircraftMSN) {
   // Always add OEB search — mandatory for every ECAM scenario
   subQueries.push('OPERATIONS ENGINEERING BULLETINS OEB RED QRH');
 
+  // CAB PR SYS 1+2 FAULT — inject hardcoded procedure when both CPCs failed
+  // Triggered by: compound MEL + CPC fault, or explicit "SYS 1+2" in query/context
+  if(/CAB\s*PR\s*SYS\s*1.?2|CPC\s*1.?2\s*(INOP|FAULT|FAIL)|both\s*CPC|dual\s*CPC|1\+2\s*FAULT/i.test(query + ' ' + melContext)){
+    oebContext += '\n\n=== FCOM HARDCODED: CAB PR SYS 1+2 FAULT PROCEDURE ===\n';
+    oebContext += CAB_PR_SYS_1_2_FAULT_PROC + '\n';
+  }
+
   // CAB PR EXCESS CAB ALT — inject hardcoded procedure based on FL in query
   if(/CAB\s*PR\s*EXCESS|CAB\s+PR\s+EXCESS|EXCESS\s+CAB\s+ALT|depressuri/i.test(query)){
     var flMatch = query.match(/FL\s*(\d{2,3})/i);
@@ -4397,4 +4404,45 @@ function setAIMode(mode) {
 
 </script>
 </body>
-</html>
+</html
+// CAB PR SYS 1+2 FAULT — hardcoded procedure (both CPCs failed)
+// FCOM PRO-ABN-CAB_PR-V-00017319.0001001 / Applicable to: ALL
+var CAB_PR_SYS_1_2_FAULT_PROC = [
+  '=== FCOM PRO-ABN: CAB PR SYS 1+2 FAULT ===',
+  'TRIGGERING CONDITIONS: This alert triggers when BOTH cabin pressure controllers (CPC 1 AND CPC 2) are failed.',
+  'APPLICABLE TO: ALL A318/A319/A320/A321',
+  '',
+  'WARNING: Due to the slow closure of the outflow valve in manual pressurization mode and depending on the',
+  'failure, the following procedure may not avoid the depressurization.',
+  '',
+  'L1 ECAM ACTIONS:',
+  'MODE SEL..............................................................................MAN',
+  'MAN V/S CTL..........................................................................AS RQRD',
+  '',
+  'NOTES:',
+  '- If the alert is triggered at the beginning of the cruise phase, the manual mode may not',
+  '  be available for a few seconds, but no more than 120 s after takeoff.',
+  '- It may take 5 s in manual mode before the flight crew notices a change of the outflow',
+  '  valve position. Use the cabin V/S indication to confirm the outflow valve operation.',
+  '- Monitor cabin V/S and CAB ALT frequently and adjust as necessary.',
+  '  Maintain aircraft altitude at or above cabin altitude.',
+  '- The two safety valves limit delta P to 8.6 PSI.',
+  '',
+  'STATUS: MAN CAB PR CTL (manual pressurization control active)',
+  'TGT V/S: CLIMB 500 FT/MIN / DESC 300 FT/MIN',
+  '',
+  'CABIN ALTITUDE TARGETS BY FLIGHT LEVEL:',
+  'A/C FL 390 → CAB ALT TGT: 8000 ft',
+  'A/C FL 350 → CAB ALT TGT: 7000 ft',
+  'A/C FL 300 → CAB ALT TGT: 5500 ft',
+  'A/C FL 250 → CAB ALT TGT: 3000 ft',
+  'A/C FL < 200 → CAB ALT TGT: 0 ft',
+  '',
+  'DURING FINAL APPROACH: V/S CTL → FULL UP',
+  'When on intermediate approach (below airfield pressure altitude + 2500 ft), adjust delta P = 0.',
+  'CAUTION: Check that delta P is zero before opening the doors.',
+  '',
+  'INOP SYS: CAB PR 1+2'
+].join('\n');
+
+>
