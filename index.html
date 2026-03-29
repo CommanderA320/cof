@@ -3885,17 +3885,27 @@ function shareReport() {
 }
 
 async function sendQuery() {
-  // Ensure QRH is in _docCache before proceeding (needed for OEB check)
-  if(_aiMode !== 'procedure' && !_docCache['QRH'] && !localStorage.getItem('doc_text_QRH')) {
-    var _sq_input = document.getElementById("ai-input").value.trim();
+  // Wait for ALL documents to be preloaded before sending query
+  if(_aiMode !== 'procedure' && !_preloadDone) {
+    var _sq_input = document.getElementById('ai-input').value.trim();
     if(_sq_input) {
-      // Show loading indicator
-      var sendBtn = document.getElementById("ai-send-btn");
+      var sendBtn = document.getElementById('ai-send-btn');
+      var resultEl = document.getElementById('ai-result-body');
       if(sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
-      _loadDocFromGitHub('QRH', function(err, text) {
-        if(sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '▶'; }
-        sendQuery(); // retry after QRH loaded
-      });
+      var _loaded = Object.keys(_docCache).length;
+      var _total = REFERENCES.length;
+      if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ Dokümanlar yükleniyor... ('+_loaded+'/'+_total+')<br>Lütfen bekleyin.</div>';
+      // Poll until preload done
+      var _pollInterval = setInterval(function(){
+        var _loaded2 = Object.keys(_docCache).length;
+        if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ Dokümanlar yükleniyor... ('+_loaded2+'/'+_total+')<br>Lütfen bekleyin.</div>';
+        if(_preloadDone){
+          clearInterval(_pollInterval);
+          if(sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '▶'; }
+          if(resultEl) resultEl.innerHTML = '';
+          sendQuery();
+        }
+      }, 500);
       return;
     }
   }
@@ -3970,6 +3980,8 @@ async function sendQuery() {
   var _melRaw = _getDocText('MEL');
   var _lsKeys = [];
   try{ for(var _ki=0;_ki<localStorage.length;_ki++){ var _lk=localStorage.key(_ki); if(_lk&&_lk.indexOf('doc_text_')===0) _lsKeys.push(_lk.replace('doc_text_','')+':'+((localStorage.getItem(_lk)||'').length)); } }catch(e){}
+  var _cacheCount = Object.keys(_docCache||{}).length;
+  var _cacheKeys = Object.keys(_docCache||{}).join(',');
   if(melContext && melContext.length > 100 && apiKey && _aiMode !== 'procedure'){
     if(_dbg){ _dbg.textContent += ' | Running two-step...'; }
     try {
@@ -3994,7 +4006,7 @@ async function sendQuery() {
 
   var _dbg = document.getElementById('ai-two-step-debug');
   if(_dbg){ 
-    _dbg.textContent = '🔍 MEL raw:'+(_melRaw?_melRaw.length:0)+' | ctx:'+melContext.length+' | '+(window._melDebug||'no mel debug')+' | ls:'+_lsKeys.join(',');
+    _dbg.textContent = '🔍 MEL raw:'+(_melRaw?_melRaw.length:0)+' | ctx:'+melContext.length+' | '+(window._melDebug||'')+' | cache('+_cacheCount+'):'+_cacheKeys+' | ls:'+_lsKeys.join(',');
     _dbg.style.display='block'; _dbg.style.color='#34C759'; 
   }
 
