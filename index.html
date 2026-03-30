@@ -451,7 +451,7 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
         <span class="ai-result-title">OPERATIONAL ASSESSMENT</span>
         <span id="ai-result-time" class="ai-result-time"></span>
       </div>
-      <div id="ai-two-step-debug" style="display:none;background:#1C1C1E;color:#34C759;font-family:monospace;font-size:10px;padding:6px 10px;border-radius:6px;margin:4px 12px;">&#x1F50D; two-step retrieval: waiting...</div>
+      <div id="ai-two-step-debug" style="display:block;background:#1C1C1E;color:#34C759;font-family:monospace;font-size:10px;padding:6px 10px;border-radius:6px;margin:4px 12px;">&#x1F50D; two-step retrieval: waiting...</div>
       <div id="ai-result-body" class="ai-result-body"></div>
       <div id="ai-result-actions" style="display:none;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #F2F2F7;">
         <button onclick="openReport()" style="flex:1;background:#F2F2F7;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x1F4C4; Rapor</button>
@@ -2265,7 +2265,7 @@ function _getMELContext(registration, query){
   }
 
   // Store debug info globally
-  // MEL parse complete
+  window._melDebug = 'items:'+items.length+' | txt:'+melText.substring(0,200).replace(/[\r\n]/g,' | ');
 
   // Build parent applicability index for inheritance
   var parentApplic = {};
@@ -3680,13 +3680,10 @@ async function _getTargetedSearchTerms(query, melContext, apiKey) {
   }
 
   try {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch('https://cofbackend.vercel.app/api/query', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'x-api-key': apiKey
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: _aiModelName,
@@ -3901,11 +3898,11 @@ async function sendQuery() {
       if(sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
       var _loaded = Object.keys(_docCache).length;
       var _total = REFERENCES.length;
-      if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ LOADING... ('+_loaded+'/'+_total+')</div>';
+      if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ Dokümanlar yükleniyor... ('+_loaded+'/'+_total+')<br>Lütfen bekleyin.</div>';
       // Poll until preload done
       var _pollInterval = setInterval(function(){
         var _loaded2 = Object.keys(_docCache).length;
-        if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ LOADING... ('+_loaded2+'/'+_total+')</div>';
+        if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ Dokümanlar yükleniyor... ('+_loaded2+'/'+_total+')<br>Lütfen bekleyin.</div>';
         if(_preloadDone){
           clearInterval(_pollInterval);
           if(sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '▶'; }
@@ -3946,13 +3943,7 @@ async function sendQuery() {
   }, 100);
 
   var t = utcNow();
-  var apiKey = _ls('get','thy_api_key')||'';
-  if(!apiKey && _aiMode !== 'procedure'){
-    checkKey();
-    document.getElementById('ai-loading').className='ai-loading';
-    document.getElementById('ai-send-btn').disabled=false;
-    return;
-  }
+  var apiKey = 'backend'; // API key is handled by the backend
 
   // BM25: pick most relevant chunks from loaded docs (skip for offline procedure mode)
   var docContext = '';
@@ -3983,18 +3974,38 @@ async function sendQuery() {
   try { melContext = _getMELContext(registration, input); } catch(e) { console.error('MEL error:', e); }
 
   // TWO-STEP RETRIEVAL: detect compound scenarios and add targeted searches
+  // Show debug info always
+  var _melRaw = _getDocText('MEL');
+  var _lsKeys = [];
+  try{ for(var _ki=0;_ki<localStorage.length;_ki++){ var _lk=localStorage.key(_ki); if(_lk&&_lk.indexOf('doc_text_')===0) _lsKeys.push(_lk.replace('doc_text_','')+':'+((localStorage.getItem(_lk)||'').length)); } }catch(e){}
+  var _cacheCount = Object.keys(_docCache||{}).length;
+  var _cacheKeys = Object.keys(_docCache||{}).join(',');
   if(melContext && melContext.length > 100 && apiKey && _aiMode !== 'procedure'){
+    if(_dbg){ _dbg.textContent += ' | Running two-step...'; }
     try {
       var extraTerms = await _getTargetedSearchTerms(input, melContext, apiKey);
       if(extraTerms && extraTerms.length){
+        // DEBUG: show which terms were generated
+        var debugEl = document.getElementById('ai-two-step-debug');
+        if(debugEl){ debugEl.textContent = '🔍 TWO-STEP: ' + JSON.stringify(extraTerms); debugEl.style.display='block'; window._twoStepTerms = extraTerms; }
         extraTerms.forEach(function(term){
           if(term && term.length > 3){
             var extraContext = _bm25Search(term, 5, msnData || null);
             if(extraContext) docContext += '\n\n=== ADDITIONAL (compound search: '+term+') ===\n' + extraContext;
           }
         });
+      } else {
+        // DEBUG: show empty result
+        var debugEl2 = document.getElementById('ai-two-step-debug');
+        if(debugEl2){ debugEl2.textContent = '⚠️ TWO-STEP: no extra terms generated'; debugEl2.style.color='#FF9500'; debugEl2.style.display='block'; }
       }
     } catch(e) { console.error('Two-step retrieval error:', e); }
+  }
+
+  var _dbg = document.getElementById('ai-two-step-debug');
+  if(_dbg){ 
+    _dbg.textContent = '🔍 MEL raw:'+(_melRaw?_melRaw.length:0)+' | ctx:'+melContext.length+' | '+(window._melDebug||'')+' | cache('+_cacheCount+'):'+_cacheKeys+' | extra:'+(window._twoStepTerms?JSON.stringify(window._twoStepTerms):'none')+' | ls:'+_lsKeys.join(',');
+    _dbg.style.display='block'; _dbg.style.color='#34C759'; 
   }
 
     var systemMsg = (_aiMode === "procedure") ? AI_PROC_SYSTEM : AI_SYSTEM;
@@ -4247,15 +4258,11 @@ async function sendQuery() {
   // Final guard — never send empty content
   var finalContent = (userContent && userContent.trim()) ? userContent : ('A320 Turkish Airlines. Query: ' + input);
 
-  fetch("https://api.anthropic.com/v1/messages", {
+  fetch("https://cofbackend.vercel.app/api/query", {
     method: "POST",
     signal: _currentAbort ? _currentAbort.signal : undefined,
     headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      "anthropic-beta": "prompt-caching-2024-07-31",
-      "anthropic-dangerous-direct-browser-access": "true",
-      "x-api-key": apiKey
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       model: _aiModelName,
