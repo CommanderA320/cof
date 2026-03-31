@@ -37,11 +37,11 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SPECIFIC_DOC: ${{ github.event.inputs.doc_code }}
         run: |
-          python3 - <<'PYEOF'
-          import os, sys, fitz
+          python3 << 'PYEOF'
+          import os, sys, fitz, uuid, hashlib
           from openai import OpenAI
           from qdrant_client import QdrantClient
-          from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+          from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, PayloadSchemaType
 
           QDRANT_URL = os.environ['QDRANT_URL']
           QDRANT_API_KEY = os.environ['QDRANT_API_KEY']
@@ -53,28 +53,33 @@ jobs:
           openai_client = OpenAI(api_key=OPENAI_KEY)
           qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
-          # Create collection if not exists
+          # Create collection and index if not exists
           try:
             qdrant.get_collection(COLLECTION)
             print(f'Collection {COLLECTION} exists')
-          except:
+          except Exception:
             qdrant.create_collection(
               collection_name=COLLECTION,
               vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
             )
             print(f'Created collection {COLLECTION}')
-
-          # Create payload index for doc_code filtering
-          try:
-            from qdrant_client.models import PayloadSchemaType
             qdrant.create_payload_index(
               collection_name=COLLECTION,
-              field_name="doc_code",
+              field_name='doc_code',
               field_schema=PayloadSchemaType.KEYWORD
             )
-            print("Created doc_code index")
+            print('Created doc_code index')
+
+          # Ensure index exists (in case collection existed without index)
+          try:
+            qdrant.create_payload_index(
+              collection_name=COLLECTION,
+              field_name='doc_code',
+              field_schema=PayloadSchemaType.KEYWORD
+            )
+            print('Ensured doc_code index')
           except Exception as e:
-            print(f"Index note: {e}")
+            print(f'Index note: {e}')
 
           def get_pdfs():
             if not os.path.exists(PDF_DIR):
@@ -116,14 +121,15 @@ jobs:
             return [d.embedding for d in response.data]
 
           def delete_existing(doc_code):
-            qdrant.delete(
-              collection_name=COLLECTION,
-              points_selector=Filter(
-                must=[FieldCondition(key='doc_code', match=MatchValue(value=doc_code))]
+            try:
+              qdrant.delete(
+                collection_name=COLLECTION,
+                points_selector=Filter(
+                  must=[FieldCondition(key='doc_code', match=MatchValue(value=doc_code))]
+                )
               )
-            )
-
-          import uuid, hashlib
+            except Exception as e:
+              print(f'Delete note: {e}')
 
           def chunk_id(doc_code, chunk_index):
             h = hashlib.md5(f'{doc_code}_{chunk_index}'.encode()).hexdigest()
