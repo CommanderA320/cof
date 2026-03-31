@@ -87,7 +87,9 @@ jobs:
               console.log('SKIP — file not found:', filePath);
               return;
             }
-            const text = fs.readFileSync(filePath, 'utf8');
+            let text = fs.readFileSync(filePath, 'utf8');
+            // Remove null bytes and other problematic characters
+            text = text.replace(/\u0000/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
             if (!text || text.length < 100) { console.log('SKIP — too short:', docCode); return; }
             
             console.log('Embedding:', docCode, '(' + text.length + ' chars)');
