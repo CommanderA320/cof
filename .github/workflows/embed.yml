@@ -35,13 +35,13 @@ jobs:
           const fs = require('fs');
           const path = require('path');
 
-          const CHUNK_SIZE = 800;
-          const CHUNK_OVERLAP = 100;
           const SUPABASE_URL = process.env.SUPABASE_URL;
           const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
           const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
           function chunkText(text, docCode) {
+            const CHUNK_SIZE = docCode.includes('EASA') ? 2000 : 800;
+            const CHUNK_OVERLAP = docCode.includes('EASA') ? 200 : 100;
             const chunks = [];
             let start = 0, index = 0;
             while (start < text.length) {
