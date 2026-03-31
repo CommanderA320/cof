@@ -3970,7 +3970,28 @@ async function sendQuery() {
     msnData = {msn: null, model: typeNum || null};
   }
   var queryWithMSN = input + (msnData ? ' MSN ' + msnData.msn + ' ' + msnData.model : '');
-  try { docContext = _bm25MultiSearch(queryWithMSN, msnData || null); } catch(e) { console.error('BM25 error:', e); }
+
+  // SEMANTIC SEARCH — replace BM25
+  try {
+    var searchRes = await fetch('https://cofbackend.vercel.app/api/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query: queryWithMSN, limit: 20 })
+    });
+    var searchData = await searchRes.json();
+    if(searchData.results && searchData.results.length > 0){
+      // Group by doc, build context string
+      var byDoc = {};
+      searchData.results.forEach(function(r){
+        if(!byDoc[r.doc_code]) byDoc[r.doc_code] = [];
+        byDoc[r.doc_code].push(r.content);
+      });
+      Object.keys(byDoc).forEach(function(doc){
+        docContext += '\n\n=== ' + doc + ' ===\n' + byDoc[doc].join('\n---\n');
+      });
+    }
+  } catch(e) { console.error('Semantic search error:', e); }
+
   try { melContext = _getMELContext(registration, input); } catch(e) { console.error('MEL error:', e); }
 
   // TWO-STEP RETRIEVAL: detect compound scenarios and add targeted searches
