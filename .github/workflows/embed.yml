@@ -3,11 +3,11 @@ name: Embed Documents
 on:
   push:
     paths:
-      - 'docs/**'
+      - 'docs/pdfs/**'
   workflow_dispatch:
     inputs:
       doc_code:
-        description: 'Specific doc to embed (leave empty for all)'
+        description: 'Specific doc_code to embed (filename without .pdf, leave empty for all PDFs)'
         required: false
         default: ''
 
@@ -22,149 +22,135 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install pymupdf
-        run: pip install pymupdf
+      - name: Install dependencies
+        run: pip install pymupdf qdrant-client openai
 
-      - name: Extract PDFs to text
+      - name: Extract PDFs and Embed to Qdrant
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SPECIFIC_DOC: ${{ github.event.inputs.doc_code }}
         run: |
           python3 - <<'PYEOF'
-          import os
-          import fitz  # pymupdf
+          import os, sys, fitz
+          from openai import OpenAI
+          from qdrant_client import QdrantClient
+          from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 
-          pdf_dir = 'docs/pdfs'
-          txt_dir = 'docs'
+          QDRANT_URL = os.environ['QDRANT_URL']
+          QDRANT_API_KEY = os.environ['QDRANT_API_KEY']
+          OPENAI_KEY = os.environ['OPENAI_API_KEY']
+          SPECIFIC_DOC = os.environ.get('SPECIFIC_DOC', '').strip()
+          PDF_DIR = 'docs/pdfs'
+          COLLECTION = 'documents'
 
-          if not os.path.exists(pdf_dir):
-            print('No pdfs folder, skipping PDF extraction')
-            exit(0)
+          openai_client = OpenAI(api_key=OPENAI_KEY)
+          qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
-          for fname in os.listdir(pdf_dir):
-            if not fname.lower().endswith('.pdf'):
-              continue
-            pdf_path = os.path.join(pdf_dir, fname)
-            doc_code = os.path.splitext(fname)[0]
-            txt_path = os.path.join(txt_dir, doc_code + '.txt')
+          # Create collection if not exists
+          try:
+            qdrant.get_collection(COLLECTION)
+            print(f'Collection {COLLECTION} exists')
+          except:
+            qdrant.create_collection(
+              collection_name=COLLECTION,
+              vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+            )
+            print(f'Created collection {COLLECTION}')
 
-            print(f'Extracting: {fname}')
+          def get_pdfs():
+            if not os.path.exists(PDF_DIR):
+              print('No docs/pdfs folder')
+              return []
+            files = [f for f in os.listdir(PDF_DIR) if f.lower().endswith('.pdf')]
+            if SPECIFIC_DOC:
+              files = [f for f in files if os.path.splitext(f)[0] == SPECIFIC_DOC]
+            return files
+
+          def extract_text(pdf_path):
             doc = fitz.open(pdf_path)
             text = ''
             for page in doc:
               text += page.get_text()
             doc.close()
+            return text.replace('\x00', '')
 
-            # Clean null bytes
-            text = text.replace('\x00', '')
+          def chunk_text(text, doc_code):
+            chunk_size = 2000 if 'EASA' in doc_code else 1500
+            overlap = 200
+            chunks = []
+            start = 0
+            index = 0
+            while start < len(text):
+              end = min(start + chunk_size, len(text))
+              content = text[start:end].strip()
+              if len(content) > 50:
+                chunks.append({'doc_code': doc_code, 'chunk_index': index, 'content': content})
+                index += 1
+              start += chunk_size - overlap
+            return chunks
 
-            with open(txt_path, 'w', encoding='utf-8') as f:
-              f.write(text)
-            print(f'Done: {doc_code}.txt ({len(text)} chars)')
+          def embed_texts(texts):
+            response = openai_client.embeddings.create(
+              model='text-embedding-3-small',
+              input=texts
+            )
+            return [d.embedding for d in response.data]
+
+          def delete_existing(doc_code):
+            qdrant.delete(
+              collection_name=COLLECTION,
+              points_selector=Filter(
+                must=[FieldCondition(key='doc_code', match=MatchValue(value=doc_code))]
+              )
+            )
+
+          import uuid, hashlib
+
+          def chunk_id(doc_code, chunk_index):
+            h = hashlib.md5(f'{doc_code}_{chunk_index}'.encode()).hexdigest()
+            return str(uuid.UUID(h))
+
+          pdfs = get_pdfs()
+          if not pdfs:
+            print('No PDFs to process')
+            sys.exit(0)
+
+          for pdf_file in pdfs:
+            doc_code = os.path.splitext(pdf_file)[0]
+            pdf_path = os.path.join(PDF_DIR, pdf_file)
+
+            print(f'Processing: {pdf_file}')
+            text = extract_text(pdf_path)
+            print(f'Extracted: {len(text)} chars')
+
+            chunks = chunk_text(text, doc_code)
+            print(f'Chunks: {len(chunks)}')
+
+            delete_existing(doc_code)
+            print(f'Deleted existing: {doc_code}')
+
+            for i in range(0, len(chunks), 50):
+              batch = chunks[i:i+50]
+              embeddings = embed_texts([c['content'] for c in batch])
+              points = [
+                PointStruct(
+                  id=chunk_id(c['doc_code'], c['chunk_index']),
+                  vector=embeddings[j],
+                  payload={'doc_code': c['doc_code'], 'chunk_index': c['chunk_index'], 'content': c['content']}
+                )
+                for j, c in enumerate(batch)
+              ]
+              qdrant.upsert(collection_name=COLLECTION, points=points)
+              print(f'Progress: {doc_code} {min(i+50, len(chunks))}/{len(chunks)}')
+
+            print(f'DONE: {doc_code} {len(chunks)} chunks')
+
+          print('ALL DONE')
           PYEOF
-
-      - name: Embed documents
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          node -e "
-          const fs = require('fs');
-          const path = require('path');
-
-          const SUPABASE_URL = process.env.SUPABASE_URL;
-          const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
-          const OPENAI_KEY = process.env.OPENAI_API_KEY;
-
-          function chunkText(text, docCode) {
-            const CHUNK_SIZE = docCode.includes('EASA') ? 2000 : 1500;
-            const CHUNK_OVERLAP = 200;
-            const chunks = [];
-            let start = 0, index = 0;
-            while (start < text.length) {
-              const end = Math.min(start + CHUNK_SIZE, text.length);
-              const content = text.slice(start, end).trim();
-              if (content.length > 50) chunks.push({ doc_code: docCode, chunk_index: index++, content });
-              start += CHUNK_SIZE - CHUNK_OVERLAP;
-            }
-            return chunks;
-          }
-
-          async function embedTexts(texts) {
-            const res = await fetch('https://api.openai.com/v1/embeddings', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
-              body: JSON.stringify({ model: 'text-embedding-3-small', input: texts }),
-            });
-            const data = await res.json();
-            if (!data.data) throw new Error('OpenAI error: ' + JSON.stringify(data));
-            return data.data.map(d => d.embedding);
-          }
-
-          async function deleteExisting(docCode) {
-            await fetch(SUPABASE_URL + '/rest/v1/documents?doc_code=eq.' + encodeURIComponent(docCode), {
-              method: 'DELETE',
-              headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
-            });
-          }
-
-          async function insertChunks(chunks, embeddings) {
-            const rows = chunks.map((c, i) => ({ doc_code: c.doc_code, chunk_index: c.chunk_index, content: c.content, embedding: embeddings[i] }));
-            const res = await fetch(SUPABASE_URL + '/rest/v1/documents', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'return=minimal' },
-              body: JSON.stringify(rows),
-            });
-            if (!res.ok) throw new Error('Supabase insert failed: ' + await res.text());
-          }
-
-          async function embedDoc(docCode) {
-            const filePath = path.join('docs', docCode + '.txt');
-            if (!fs.existsSync(filePath)) {
-              console.log('SKIP — file not found:', filePath);
-              return;
-            }
-            let text = fs.readFileSync(filePath, 'utf8');
-            text = text.replace(/\u0000/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
-            if (!text || text.length < 100) { console.log('SKIP — too short:', docCode); return; }
-
-            console.log('Embedding:', docCode, '(' + text.length + ' chars)');
-            const chunks = chunkText(text, docCode);
-            console.log('Chunks:', chunks.length);
-
-            await deleteExisting(docCode);
-
-            for (let i = 0; i < chunks.length; i += 50) {
-              const batch = chunks.slice(i, i + 50);
-              const embeddings = await embedTexts(batch.map(c => c.content));
-              await insertChunks(batch, embeddings);
-              console.log('Progress:', docCode, Math.min(i + 50, chunks.length) + '/' + chunks.length);
-            }
-            console.log('DONE:', docCode, chunks.length, 'chunks');
-          }
-
-          async function main() {
-            const specificDoc = '${{ github.event.inputs.doc_code }}';
-
-            if (specificDoc && specificDoc.trim()) {
-              await embedDoc(specificDoc.trim());
-            } else {
-              const files = fs.readdirSync('docs').filter(f => f.endsWith('.txt'));
-              for (const file of files) {
-                const docCode = file.replace('.txt', '');
-                await embedDoc(docCode);
-              }
-            }
-            console.log('ALL DONE');
-          }
-
-          main().catch(e => { console.error(e); process.exit(1); });
-          "
