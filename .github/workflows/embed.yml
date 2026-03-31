@@ -64,6 +64,18 @@ jobs:
             )
             print(f'Created collection {COLLECTION}')
 
+          # Create payload index for doc_code filtering
+          try:
+            from qdrant_client.models import PayloadSchemaType
+            qdrant.create_payload_index(
+              collection_name=COLLECTION,
+              field_name="doc_code",
+              field_schema=PayloadSchemaType.KEYWORD
+            )
+            print("Created doc_code index")
+          except Exception as e:
+            print(f"Index note: {e}")
+
           def get_pdfs():
             if not os.path.exists(PDF_DIR):
               print('No docs/pdfs folder')
