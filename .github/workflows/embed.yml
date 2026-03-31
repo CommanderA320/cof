@@ -14,16 +14,61 @@ on:
 jobs:
   embed:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    
+    timeout-minutes: 120
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pymupdf
+        run: pip install pymupdf
+
+      - name: Extract PDFs to text
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          import fitz  # pymupdf
+
+          pdf_dir = 'docs/pdfs'
+          txt_dir = 'docs'
+
+          if not os.path.exists(pdf_dir):
+            print('No pdfs folder, skipping PDF extraction')
+            exit(0)
+
+          for fname in os.listdir(pdf_dir):
+            if not fname.lower().endswith('.pdf'):
+              continue
+            pdf_path = os.path.join(pdf_dir, fname)
+            doc_code = os.path.splitext(fname)[0]
+            txt_path = os.path.join(txt_dir, doc_code + '.txt')
+
+            print(f'Extracting: {fname}')
+            doc = fitz.open(pdf_path)
+            text = ''
+            for page in doc:
+              text += page.get_text()
+            doc.close()
+
+            # Clean null bytes
+            text = text.replace('\x00', '')
+
+            with open(txt_path, 'w', encoding='utf-8') as f:
+              f.write(text)
+            print(f'Done: {doc_code}.txt ({len(text)} chars)')
+          PYEOF
 
       - name: Embed documents
         env:
@@ -41,7 +86,7 @@ jobs:
 
           function chunkText(text, docCode) {
             const CHUNK_SIZE = docCode.includes('EASA') ? 2000 : 1500;
-            const CHUNK_OVERLAP = docCode.includes('EASA') ? 200 : 200;
+            const CHUNK_OVERLAP = 200;
             const chunks = [];
             let start = 0, index = 0;
             while (start < text.length) {
@@ -82,22 +127,21 @@ jobs:
           }
 
           async function embedDoc(docCode) {
-            const filePath = path.join('docs', docCode.replace(/[^a-zA-Z0-9_\-]/g, '_') + '.txt');
+            const filePath = path.join('docs', docCode + '.txt');
             if (!fs.existsSync(filePath)) {
               console.log('SKIP — file not found:', filePath);
               return;
             }
             let text = fs.readFileSync(filePath, 'utf8');
-            // Remove null bytes and other problematic characters
             text = text.replace(/\u0000/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
             if (!text || text.length < 100) { console.log('SKIP — too short:', docCode); return; }
-            
+
             console.log('Embedding:', docCode, '(' + text.length + ' chars)');
             const chunks = chunkText(text, docCode);
             console.log('Chunks:', chunks.length);
-            
+
             await deleteExisting(docCode);
-            
+
             for (let i = 0; i < chunks.length; i += 50) {
               const batch = chunks.slice(i, i + 50);
               const embeddings = await embedTexts(batch.map(c => c.content));
@@ -109,17 +153,14 @@ jobs:
 
           async function main() {
             const specificDoc = '${{ github.event.inputs.doc_code }}';
-            
+
             if (specificDoc && specificDoc.trim()) {
               await embedDoc(specificDoc.trim());
             } else {
-              // Embed all docs in docs/ folder
               const files = fs.readdirSync('docs').filter(f => f.endsWith('.txt'));
               for (const file of files) {
-                const docCode = file.replace('.txt', '').replace(/_/g, ' ').trim();
-                // Try both underscore and space versions
-                const docCodeRaw = file.replace('.txt', '');
-                await embedDoc(docCodeRaw);
+                const docCode = file.replace('.txt', '');
+                await embedDoc(docCode);
               }
             }
             console.log('ALL DONE');
