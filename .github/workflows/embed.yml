@@ -286,6 +286,8 @@ jobs:
 
           table_section = text[table_idx:table_idx + 50000]
           lines = table_section.split('\n')
+          print('DEBUG first 30 lines:')
+          for dl in lines[:30]: print(repr(dl))
 
           fleet = {}
           count = 0
