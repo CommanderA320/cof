@@ -45,7 +45,6 @@ jobs:
           QDRANT_API_KEY = os.environ['QDRANT_API_KEY']
           COLLECTION = 'documents'
 
-          # Find deleted PDF files in this commit
           result = subprocess.run(
             ['git', 'diff', '--name-status', 'HEAD~1', 'HEAD'],
             capture_output=True, text=True
@@ -83,7 +82,7 @@ jobs:
           SPECIFIC_DOC: ${{ github.event.inputs.doc_code }}
         run: |
           python3 << 'PYEOF'
-          import os, sys, fitz, uuid, hashlib
+          import os, sys, re, fitz, uuid, hashlib
           from openai import OpenAI
           from qdrant_client import QdrantClient
           from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, PayloadSchemaType
@@ -141,6 +140,23 @@ jobs:
             return text.replace('\x00', '')
 
           def chunk_text(text, doc_code):
+            # QRH: prosedür başlıklarına göre böl
+            if doc_code.upper() == 'QRH':
+              HEADER = re.compile(r'^([A-Z][A-Z0-9 /\-]{3,59})\s*$', re.MULTILINE)
+              matches = list(HEADER.finditer(text))
+              chunks = []
+              for idx, m in enumerate(matches):
+                start = m.start()
+                end = matches[idx+1].start() if idx+1 < len(matches) else len(text)
+                content = text[start:end].strip()
+                if len(content) > 80:
+                  chunks.append({'doc_code': doc_code, 'chunk_index': idx, 'content': content})
+              if chunks:
+                print(f'QRH procedure-based chunking: {len(chunks)} chunks')
+                return chunks
+              print('QRH header detection failed, falling back to sliding window')
+
+            # Diger tum PDF'ler: sliding window
             chunk_size = 2000 if 'EASA' in doc_code else 1500
             overlap = 200
             chunks = []
