@@ -1,0 +1,987 @@
+{
+  "TC-JLS": {
+    "model": "319-132",
+    "msn": "04629",
+    "type": "A319"
+  },
+  "TC-JLT": {
+    "model": "319-132",
+    "msn": "04665",
+    "type": "A319"
+  },
+  "TC-JLU": {
+    "model": "319-132",
+    "msn": "04695",
+    "type": "A319"
+  },
+  "TC-JLV": {
+    "model": "319-132",
+    "msn": "04755",
+    "type": "A319"
+  },
+  "TC-JLY": {
+    "model": "319-132",
+    "msn": "04774",
+    "type": "A319"
+  },
+  "TC-JLZ": {
+    "model": "319-132",
+    "msn": "04790",
+    "type": "A319"
+  },
+  "TC-JMH": {
+    "model": "321-231",
+    "msn": "03637",
+    "type": "A321ceo"
+  },
+  "TC-JMI": {
+    "model": "321-231",
+    "msn": "03673",
+    "type": "A321ceo"
+  },
+  "TC-JMJ": {
+    "model": "321-231",
+    "msn": "03688",
+    "type": "A321ceo"
+  },
+  "TC-JMK": {
+    "model": "321-231",
+    "msn": "03738",
+    "type": "A321ceo"
+  },
+  "TC-JML": {
+    "model": "321-231",
+    "msn": "03382",
+    "type": "A321ceo"
+  },
+  "TC-JMP": {
+    "model": "321-231",
+    "msn": "05025",
+    "type": "A321ceo"
+  },
+  "TC-JPH": {
+    "model": "320-232",
+    "msn": "03185",
+    "type": "A320ceo"
+  },
+  "TC-JPI": {
+    "model": "320-232",
+    "msn": "03208",
+    "type": "A320ceo"
+  },
+  "TC-JPJ": {
+    "model": "320-232",
+    "msn": "03239",
+    "type": "A320ceo"
+  },
+  "TC-JPK": {
+    "model": "320-232",
+    "msn": "03257",
+    "type": "A320ceo"
+  },
+  "TC-JPL": {
+    "model": "320-232",
+    "msn": "03303",
+    "type": "A320ceo"
+  },
+  "TC-JPM": {
+    "model": "320-232",
+    "msn": "03341",
+    "type": "A320ceo"
+  },
+  "TC-JPN": {
+    "model": "320-232",
+    "msn": "03558",
+    "type": "A320ceo"
+  },
+  "TC-JPP": {
+    "model": "320-232",
+    "msn": "03603",
+    "type": "A320ceo"
+  },
+  "TC-JPR": {
+    "model": "320-232",
+    "msn": "03654",
+    "type": "A320ceo"
+  },
+  "TC-JPS": {
+    "model": "320-232",
+    "msn": "03718",
+    "type": "A320ceo"
+  },
+  "TC-JPT": {
+    "model": "320-232",
+    "msn": "03719",
+    "type": "A320ceo"
+  },
+  "TC-JPZ": {
+    "model": "320-232",
+    "msn": "03567",
+    "type": "A320ceo"
+  },
+  "TC-JRA": {
+    "model": "321-231",
+    "msn": "02823",
+    "type": "A321ceo"
+  },
+  "TC-JRB": {
+    "model": "321-231",
+    "msn": "02868",
+    "type": "A321ceo"
+  },
+  "TC-JRC": {
+    "model": "321-231",
+    "msn": "02999",
+    "type": "A321ceo"
+  },
+  "TC-JRD": {
+    "model": "321-231",
+    "msn": "03015",
+    "type": "A321ceo"
+  },
+  "TC-JRE": {
+    "model": "321-231",
+    "msn": "03126",
+    "type": "A321ceo"
+  },
+  "TC-JRF": {
+    "model": "321-231",
+    "msn": "03207",
+    "type": "A321ceo"
+  },
+  "TC-JRG": {
+    "model": "321-231",
+    "msn": "03283",
+    "type": "A321ceo"
+  },
+  "TC-JRH": {
+    "model": "321-231",
+    "msn": "03350",
+    "type": "A321ceo"
+  },
+  "TC-JRI": {
+    "model": "321-231",
+    "msn": "03405",
+    "type": "A321ceo"
+  },
+  "TC-JRJ": {
+    "model": "321-231",
+    "msn": "03429",
+    "type": "A321ceo"
+  },
+  "TC-JRK": {
+    "model": "321-231",
+    "msn": "03525",
+    "type": "A321ceo"
+  },
+  "TC-JRL": {
+    "model": "321-231",
+    "msn": "03539",
+    "type": "A321ceo"
+  },
+  "TC-JRM": {
+    "model": "321-231",
+    "msn": "04643",
+    "type": "A321ceo"
+  },
+  "TC-JRN": {
+    "model": "321-231",
+    "msn": "04654",
+    "type": "A321ceo"
+  },
+  "TC-JRO": {
+    "model": "321-231",
+    "msn": "04682",
+    "type": "A321ceo"
+  },
+  "TC-JRP": {
+    "model": "321-231",
+    "msn": "04698",
+    "type": "A321ceo"
+  },
+  "TC-JRR": {
+    "model": "321-231",
+    "msn": "04706",
+    "type": "A321ceo"
+  },
+  "TC-JRS": {
+    "model": "321-231",
+    "msn": "04761",
+    "type": "A321ceo"
+  },
+  "TC-JRT": {
+    "model": "321-231",
+    "msn": "04779",
+    "type": "A321ceo"
+  },
+  "TC-JRU": {
+    "model": "321-231",
+    "msn": "04788",
+    "type": "A321ceo"
+  },
+  "TC-JRV": {
+    "model": "321-231",
+    "msn": "05077",
+    "type": "A321ceo"
+  },
+  "TC-JRY": {
+    "model": "321-231",
+    "msn": "05083",
+    "type": "A321ceo"
+  },
+  "TC-JRZ": {
+    "model": "321-231",
+    "msn": "05118",
+    "type": "A321ceo"
+  },
+  "TC-JSA": {
+    "model": "321-231",
+    "msn": "05154",
+    "type": "A321ceo"
+  },
+  "TC-JSB": {
+    "model": "321-231",
+    "msn": "05205",
+    "type": "A321ceo"
+  },
+  "TC-JSC": {
+    "model": "321-231",
+    "msn": "05254",
+    "type": "A321ceo"
+  },
+  "TC-JSD": {
+    "model": "321-231",
+    "msn": "05388",
+    "type": "A321ceo"
+  },
+  "TC-JSE": {
+    "model": "321-231",
+    "msn": "05450",
+    "type": "A321ceo"
+  },
+  "TC-JSF": {
+    "model": "321-231",
+    "msn": "05465",
+    "type": "A321ceo"
+  },
+  "TC-JSG": {
+    "model": "321-231",
+    "msn": "05490",
+    "type": "A321ceo"
+  },
+  "TC-JSI": {
+    "model": "321-231",
+    "msn": "05584",
+    "type": "A321ceo"
+  },
+  "TC-JSJ": {
+    "model": "321-231",
+    "msn": "05633",
+    "type": "A321ceo"
+  },
+  "TC-JSK": {
+    "model": "321-231",
+    "msn": "05663",
+    "type": "A321ceo"
+  },
+  "TC-JSL": {
+    "model": "321-231",
+    "msn": "05667",
+    "type": "A321ceo"
+  },
+  "TC-JSM": {
+    "model": "321-231",
+    "msn": "05689",
+    "type": "A321ceo"
+  },
+  "TC-JSN": {
+    "model": "321-231",
+    "msn": "06508",
+    "type": "A321ceo"
+  },
+  "TC-JSO": {
+    "model": "321-231",
+    "msn": "06563",
+    "type": "A321ceo"
+  },
+  "TC-JSP": {
+    "model": "321-231",
+    "msn": "06599",
+    "type": "A321ceo"
+  },
+  "TC-JSR": {
+    "model": "321-231",
+    "msn": "06652",
+    "type": "A321ceo"
+  },
+  "TC-JSS": {
+    "model": "321-231",
+    "msn": "06657",
+    "type": "A321ceo"
+  },
+  "TC-JST": {
+    "model": "321-231",
+    "msn": "06682",
+    "type": "A321ceo"
+  },
+  "TC-JSU": {
+    "model": "321-231",
+    "msn": "06709",
+    "type": "A321ceo"
+  },
+  "TC-JSV": {
+    "model": "321-231",
+    "msn": "06751",
+    "type": "A321ceo"
+  },
+  "TC-JSY": {
+    "model": "321-231",
+    "msn": "06758",
+    "type": "A321ceo"
+  },
+  "TC-JSZ": {
+    "model": "321-231",
+    "msn": "06766",
+    "type": "A321ceo"
+  },
+  "TC-JTA": {
+    "model": "321-231",
+    "msn": "06781",
+    "type": "A321ceo"
+  },
+  "TC-JTD": {
+    "model": "321-231",
+    "msn": "06822",
+    "type": "A321ceo"
+  },
+  "TC-JTE": {
+    "model": "321-231",
+    "msn": "06869",
+    "type": "A321ceo"
+  },
+  "TC-JTF": {
+    "model": "321-231",
+    "msn": "06987",
+    "type": "A321ceo"
+  },
+  "TC-JTG": {
+    "model": "321-231",
+    "msn": "06990",
+    "type": "A321ceo"
+  },
+  "TC-JTH": {
+    "model": "321-231",
+    "msn": "07029",
+    "type": "A321ceo"
+  },
+  "TC-JTI": {
+    "model": "321-231",
+    "msn": "07089",
+    "type": "A321ceo"
+  },
+  "TC-JTJ": {
+    "model": "321-231",
+    "msn": "07139",
+    "type": "A321ceo"
+  },
+  "TC-JTK": {
+    "model": "321-231",
+    "msn": "07146",
+    "type": "A321ceo"
+  },
+  "TC-JTL": {
+    "model": "321-231",
+    "msn": "07166",
+    "type": "A321ceo"
+  },
+  "TC-JTM": {
+    "model": "321-231",
+    "msn": "07242",
+    "type": "A321ceo"
+  },
+  "TC-JTN": {
+    "model": "321-231",
+    "msn": "07274",
+    "type": "A321ceo"
+  },
+  "TC-JTO": {
+    "model": "321-231",
+    "msn": "07299",
+    "type": "A321ceo"
+  },
+  "TC-JTP": {
+    "model": "321-231",
+    "msn": "07516",
+    "type": "A321ceo"
+  },
+  "TC-JTR": {
+    "model": "321-231",
+    "msn": "07518",
+    "type": "A321ceo"
+  },
+  "TC-LBA": {
+    "model": "320-271N",
+    "msn": "11506",
+    "type": "A320neo"
+  },
+  "TC-LBB": {
+    "model": "320-271N",
+    "msn": "11361",
+    "type": "A320neo"
+  },
+  "TC-LBC": {
+    "model": "321-231",
+    "msn": "06009",
+    "type": "A321ceo"
+  },
+  "TC-LBD": {
+    "model": "321-231",
+    "msn": "06294",
+    "type": "A321ceo"
+  },
+  "TC-LBF": {
+    "model": "320-271N",
+    "msn": "08101",
+    "type": "A320neo"
+  },
+  "TC-LBG": {
+    "model": "320-271N",
+    "msn": "08168",
+    "type": "A320neo"
+  },
+  "TC-LBH": {
+    "model": "320-271N",
+    "msn": "08218",
+    "type": "A320neo"
+  },
+  "TC-LBJ": {
+    "model": "320-271N",
+    "msn": "07871",
+    "type": "A320neo"
+  },
+  "TC-LBK": {
+    "model": "320-271N",
+    "msn": "09332",
+    "type": "A320neo"
+  },
+  "TC-LBM": {
+    "model": "320-232",
+    "msn": "05604",
+    "type": "A320ceo"
+  },
+  "TC-LBO": {
+    "model": "320-271N",
+    "msn": "08832",
+    "type": "A320neo"
+  },
+  "TC-LBP": {
+    "model": "320-232",
+    "msn": "06086",
+    "type": "A320ceo"
+  },
+  "TC-LBR": {
+    "model": "320-271N",
+    "msn": "08901",
+    "type": "A320neo"
+  },
+  "TC-LBT": {
+    "model": "320-271N",
+    "msn": "11111",
+    "type": "A320neo"
+  },
+  "TC-LBZ": {
+    "model": "320-271N",
+    "msn": "08896",
+    "type": "A320neo"
+  },
+  "TC-LPA": {
+    "model": "321-271NX",
+    "msn": "11464",
+    "type": "A321neo"
+  },
+  "TC-LPB": {
+    "model": "321-271NX",
+    "msn": "11622",
+    "type": "A321neo"
+  },
+  "TC-LPC": {
+    "model": "321-271NX",
+    "msn": "11704",
+    "type": "A321neo"
+  },
+  "TC-LPD": {
+    "model": "321-271NX",
+    "msn": "11843",
+    "type": "A321neo"
+  },
+  "TC-LPE": {
+    "model": "321-271NX",
+    "msn": "11944",
+    "type": "A321neo"
+  },
+  "TC-LPF": {
+    "model": "321-271NX",
+    "msn": "12077",
+    "type": "A321neo"
+  },
+  "TC-LPG": {
+    "model": "321-271NX",
+    "msn": "12364",
+    "type": "A321neo"
+  },
+  "TC-LPH": {
+    "model": "321-271NX",
+    "msn": "11898",
+    "type": "A321neo"
+  },
+  "TC-LPI": {
+    "model": "321-271NX",
+    "msn": "11999",
+    "type": "A321neo"
+  },
+  "TC-LPJ": {
+    "model": "321-271NX",
+    "msn": "11976",
+    "type": "A321neo"
+  },
+  "TC-LPK": {
+    "model": "321-271NX",
+    "msn": "12157",
+    "type": "A321neo"
+  },
+  "TC-LPL": {
+    "model": "321-271NX",
+    "msn": "12075",
+    "type": "A321neo"
+  },
+  "TC-LPM": {
+    "model": "321-271NX",
+    "msn": "12065",
+    "type": "A321neo"
+  },
+  "TC-LPN": {
+    "model": "321-271NX",
+    "msn": "12115",
+    "type": "A321neo"
+  },
+  "TC-LPO": {
+    "model": "321-271NX",
+    "msn": "12410",
+    "type": "A321neo"
+  },
+  "TC-LPP": {
+    "model": "321-271NX",
+    "msn": "12431",
+    "type": "A321neo"
+  },
+  "TC-LPR": {
+    "model": "321-271NX",
+    "msn": "12577",
+    "type": "A321neo"
+  },
+  "TC-LPS": {
+    "model": "321-271NX",
+    "msn": "12775",
+    "type": "A321neo"
+  },
+  "TC-LPT": {
+    "model": "321-271NX",
+    "msn": "12786",
+    "type": "A321neo"
+  },
+  "TC-LPU": {
+    "model": "321-271NX",
+    "msn": "12828",
+    "type": "A321neo"
+  },
+  "TC-LPV": {
+    "model": "321-271NX",
+    "msn": "12831",
+    "type": "A321neo"
+  },
+  "TC-LPY": {
+    "model": "321-271NX",
+    "msn": "12866",
+    "type": "A321neo"
+  },
+  "TC-LPZ": {
+    "model": "321-271NX",
+    "msn": "12914",
+    "type": "A321neo"
+  },
+  "TC-LRA": {
+    "model": "321-271NX",
+    "msn": "12935",
+    "type": "A321neo"
+  },
+  "TC-LRB": {
+    "model": "321-271NX",
+    "msn": "12955",
+    "type": "A321neo"
+  },
+  "TC-LRC": {
+    "model": "321-271NX",
+    "msn": "12980",
+    "type": "A321neo"
+  },
+  "TC-LRD": {
+    "model": "321-271NX",
+    "msn": "12993",
+    "type": "A321neo"
+  },
+  "TC-LRE": {
+    "model": "321-271NX",
+    "msn": "13005",
+    "type": "A321neo"
+  },
+  "TC-LRF": {
+    "model": "321-271NX",
+    "msn": "13128",
+    "type": "A321neo"
+  },
+  "TC-LRG": {
+    "model": "321-271NX",
+    "msn": "13298",
+    "type": "A321neo"
+  },
+  "TC-LSA": {
+    "model": "321-271NX",
+    "msn": "08155",
+    "type": "A321neo"
+  },
+  "TC-LSB": {
+    "model": "321-271NX",
+    "msn": "08257",
+    "type": "A321neo"
+  },
+  "TC-LSC": {
+    "model": "321-271NX",
+    "msn": "08617",
+    "type": "A321neo"
+  },
+  "TC-LSD": {
+    "model": "321-271NX",
+    "msn": "08727",
+    "type": "A321neo"
+  },
+  "TC-LSE": {
+    "model": "321-271NX",
+    "msn": "08732",
+    "type": "A321neo"
+  },
+  "TC-LSF": {
+    "model": "321-271NX",
+    "msn": "08740",
+    "type": "A321neo"
+  },
+  "TC-LSG": {
+    "model": "321-271NX",
+    "msn": "08794",
+    "type": "A321neo"
+  },
+  "TC-LSH": {
+    "model": "321-271NX",
+    "msn": "08919",
+    "type": "A321neo"
+  },
+  "TC-LSJ": {
+    "model": "321-271NX",
+    "msn": "08957",
+    "type": "A321neo"
+  },
+  "TC-LSK": {
+    "model": "321-271NX",
+    "msn": "09082",
+    "type": "A321neo"
+  },
+  "TC-LSL": {
+    "model": "321-271NX",
+    "msn": "09000",
+    "type": "A321neo"
+  },
+  "TC-LSM": {
+    "model": "321-271NX",
+    "msn": "09044",
+    "type": "A321neo"
+  },
+  "TC-LSN": {
+    "model": "321-271NX",
+    "msn": "09076",
+    "type": "A321neo"
+  },
+  "TC-LSO": {
+    "model": "321-271NX",
+    "msn": "09095",
+    "type": "A321neo"
+  },
+  "TC-LSP": {
+    "model": "321-271NX",
+    "msn": "09109",
+    "type": "A321neo"
+  },
+  "TC-LSR": {
+    "model": "321-271NX",
+    "msn": "09138",
+    "type": "A321neo"
+  },
+  "TC-LSS": {
+    "model": "321-271NX",
+    "msn": "09157",
+    "type": "A321neo"
+  },
+  "TC-LST": {
+    "model": "321-271NX",
+    "msn": "09326",
+    "type": "A321neo"
+  },
+  "TC-LSU": {
+    "model": "321-271NX",
+    "msn": "09376",
+    "type": "A321neo"
+  },
+  "TC-LSV": {
+    "model": "321-271NX",
+    "msn": "09496",
+    "type": "A321neo"
+  },
+  "TC-LSY": {
+    "model": "321-271NX",
+    "msn": "09415",
+    "type": "A321neo"
+  },
+  "TC-LSZ": {
+    "model": "321-271NX",
+    "msn": "09452",
+    "type": "A321neo"
+  },
+  "TC-LTA": {
+    "model": "321-271NX",
+    "msn": "09567",
+    "type": "A321neo"
+  },
+  "TC-LTB": {
+    "model": "321-271NX",
+    "msn": "10125",
+    "type": "A321neo"
+  },
+  "TC-LTC": {
+    "model": "321-271NX",
+    "msn": "10143",
+    "type": "A321neo"
+  },
+  "TC-LTD": {
+    "model": "321-271NX",
+    "msn": "10222",
+    "type": "A321neo"
+  },
+  "TC-LTE": {
+    "model": "321-271NX",
+    "msn": "10259",
+    "type": "A321neo"
+  },
+  "TC-LTF": {
+    "model": "321-271NX",
+    "msn": "10346",
+    "type": "A321neo"
+  },
+  "TC-LTG": {
+    "model": "321-271NX",
+    "msn": "10375",
+    "type": "A321neo"
+  },
+  "TC-LTH": {
+    "model": "321-271NX",
+    "msn": "10382",
+    "type": "A321neo"
+  },
+  "TC-LTI": {
+    "model": "321-271NX",
+    "msn": "10367",
+    "type": "A321neo"
+  },
+  "TC-LTJ": {
+    "model": "321-271NX",
+    "msn": "10723",
+    "type": "A321neo"
+  },
+  "TC-LTK": {
+    "model": "321-271NX",
+    "msn": "10751",
+    "type": "A321neo"
+  },
+  "TC-LTL": {
+    "model": "321-271NX",
+    "msn": "10878",
+    "type": "A321neo"
+  },
+  "TC-LTM": {
+    "model": "321-271NX",
+    "msn": "10854",
+    "type": "A321neo"
+  },
+  "TC-LTN": {
+    "model": "321-271NX",
+    "msn": "11048",
+    "type": "A321neo"
+  },
+  "TC-LTO": {
+    "model": "321-271NX",
+    "msn": "10947",
+    "type": "A321neo"
+  },
+  "TC-LTP": {
+    "model": "321-271NX",
+    "msn": "11148",
+    "type": "A321neo"
+  },
+  "TC-LTR": {
+    "model": "321-271NX",
+    "msn": "11212",
+    "type": "A321neo"
+  },
+  "TC-LTT": {
+    "model": "321-271NX",
+    "msn": "11144",
+    "type": "A321neo"
+  },
+  "TC-LTY": {
+    "model": "321-271NX",
+    "msn": "11390",
+    "type": "A321neo"
+  },
+  "TC-LTZ": {
+    "model": "321-271NX",
+    "msn": "11249",
+    "type": "A321neo"
+  },
+  "TC-LUA": {
+    "model": "321-271NX",
+    "msn": "10128",
+    "type": "A321neo"
+  },
+  "TC-LUB": {
+    "model": "321-271NX",
+    "msn": "10272",
+    "type": "A321neo"
+  },
+  "TC-LUC": {
+    "model": "321-271NX",
+    "msn": "10275",
+    "type": "A321neo"
+  },
+  "TC-LUE": {
+    "model": "321-271NX",
+    "msn": "10331",
+    "type": "A321neo"
+  },
+  "TC-LUK": {
+    "model": "320-271N",
+    "msn": "11103",
+    "type": "A320neo"
+  },
+  "TC-LUL": {
+    "model": "320-271N",
+    "msn": "11090",
+    "type": "A320neo"
+  },
+  "TC-LUM": {
+    "model": "321-271NX",
+    "msn": "10973",
+    "type": "A321neo"
+  },
+  "TC-LUN": {
+    "model": "320-271N",
+    "msn": "11037",
+    "type": "A320neo"
+  },
+  "TC-LUO": {
+    "model": "320-271N",
+    "msn": "11147",
+    "type": "A320neo"
+  },
+  "TC-LUP": {
+    "model": "321-271NX",
+    "msn": "11353",
+    "type": "A321neo"
+  },
+  "TC-LUR": {
+    "model": "321-271NX",
+    "msn": "11658",
+    "type": "A321neo"
+  },
+  "TC-LUS": {
+    "model": "320-271N",
+    "msn": "09467",
+    "type": "A320neo"
+  },
+  "TC-LUU": {
+    "model": "320-271N",
+    "msn": "10011",
+    "type": "A320neo"
+  },
+  "TC-LUV": {
+    "model": "320-271N",
+    "msn": "11163",
+    "type": "A320neo"
+  },
+  "TC-LUY": {
+    "model": "320-271N",
+    "msn": "11333",
+    "type": "A320neo"
+  },
+  "TC-LUZ": {
+    "model": "320-271N",
+    "msn": "11446",
+    "type": "A320neo"
+  },
+  "TC-NDA": {
+    "model": "320-271N",
+    "msn": "11130",
+    "type": "A320neo"
+  },
+  "TC-NDB": {
+    "model": "320-271N",
+    "msn": "11052",
+    "type": "A320neo"
+  },
+  "TC-NDC": {
+    "model": "320-271N",
+    "msn": "11160",
+    "type": "A320neo"
+  },
+  "TC-NDE": {
+    "model": "321-271NX",
+    "msn": "08906",
+    "type": "A321neo"
+  },
+  "TC-NDF": {
+    "model": "321-271N",
+    "msn": "08937",
+    "type": "A321neo"
+  },
+  "TC-NDG": {
+    "model": "320-271N",
+    "msn": "07858",
+    "type": "A320neo"
+  },
+  "TC-NDH": {
+    "model": "320-271N",
+    "msn": "08737",
+    "type": "A320neo"
+  },
+  "TC-NDL": {
+    "model": "320-271N",
+    "msn": "09155",
+    "type": "A320neo"
+  },
+  "TC-NDN": {
+    "model": "320-271N",
+    "msn": "09358",
+    "type": "A320neo"
+  },
+  "TC-NDT": {
+    "model": "320-271N",
+    "msn": "13222",
+    "type": "A320neo"
+  }
+}
