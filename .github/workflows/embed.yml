@@ -272,12 +272,17 @@ jobs:
             text += page.get_text()
           doc.close()
 
-          # Allocation table bolumunu bul
+          # Allocation table bolumunu bul - MSN/Registration basliklarini ara
           table_idx = -1
-          for pattern in [r'AIRCRAFT\s*ALLOCATION\s*TABLE', r'ALLOCATION\s*TABLE', r'A/C\s*ALLOCATION']:
-            m = re.search(pattern, text, re.IGNORECASE)
-            if m:
-              table_idx = m.start()
+          # Tum eslesimleri bul, MSN ve Registration basliklarinin gectigi yeri sec
+          for pattern in [r'AIRCRAFT\s*ALLOCATION\s*TABLE', r'ALLOCATION\s*TABLE']:
+            for m in re.finditer(pattern, text, re.IGNORECASE):
+              # Bu bolumde MSN ve Registration var mi kontrol et
+              section = text[m.start():m.start()+5000]
+              if re.search(r'\bMSN\b', section) and re.search(r'TC-[A-Z]{3}', section):
+                table_idx = m.start()
+                break
+            if table_idx != -1:
               break
 
           if table_idx == -1:
