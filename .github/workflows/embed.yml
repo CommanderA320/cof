@@ -132,12 +132,16 @@ jobs:
             return files
 
           def extract_text(pdf_path):
-            doc = fitz.open(pdf_path)
-            text = ''
-            for page in doc:
-              text += page.get_text()
-            doc.close()
-            return text.replace('\x00', '')
+            try:
+              doc = fitz.open(pdf_path)
+              text = ''
+              for page in doc:
+                text += page.get_text()
+              doc.close()
+              return text.replace('\x00', '')
+            except Exception as e:
+              print(f'WARNING: Could not extract {pdf_path}: {e}')
+              return ''
 
           def chunk_text(text, doc_code):
             if doc_code.upper() == 'QRH':
@@ -204,6 +208,9 @@ jobs:
             text = extract_text(pdf_path)
             print(f'Extracted: {len(text)} chars')
 
+            if not text:
+              print(f'SKIP: {doc_code} (no text extracted)')
+              continue
             chunks = chunk_text(text, doc_code)
             print(f'Chunks: {len(chunks)}')
 
