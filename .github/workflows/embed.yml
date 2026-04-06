@@ -20,7 +20,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: false
           fetch-depth: 2
 
       - name: Setup Python
@@ -144,20 +144,39 @@ jobs:
               return ''
 
           def chunk_text(text, doc_code):
-            if doc_code.upper() == 'QRH':
-              HEADER = re.compile(r'^([A-Z][A-Z0-9 /\-]{3,59})\s*$', re.MULTILINE)
-              matches = list(HEADER.finditer(text))
+            dc = doc_code.upper()
+
+            if dc == 'QRH':
               chunks = []
-              for idx, m in enumerate(matches):
-                start = m.start()
-                end = matches[idx+1].start() if idx+1 < len(matches) else len(text)
-                content = text[start:end].strip()
-                if len(content) > 80:
-                  chunks.append({'doc_code': doc_code, 'chunk_index': idx, 'content': content})
+              # QRH sayfa bazlı chunking - her prosedür başlığında böl
+              pages = re.split(r'\n(?=[A-Z][A-Z /\-]{3,50}\n)', text)
+              for idx, page in enumerate(pages):
+                page = page.strip()
+                if len(page) > 100:
+                  chunks.append({'doc_code': doc_code, 'chunk_index': idx, 'content': page})
               if chunks:
-                print(f'QRH procedure-based chunking: {len(chunks)} chunks')
+                print(f'QRH chunking: {len(chunks)} chunks')
                 return chunks
-              print('QRH header detection failed, falling back to sliding window')
+              print('QRH fallback to sliding window')
+
+            if dc == 'FCOM':
+              chunks = []
+              # FCOM bölüm bazlı chunking - her prosedür/sistem bölümünde böl
+              sections = re.split(r'\n(?=(?:PRO|SYS|DSC|LIM|ABN|NOR|SUP|FLT|ENG|HYD|ELEC|FUEL|PRES|NAV|COM|APU|DOOR|LAND|FLAP)[- ][A-Z0-9])', text)
+              for idx, section in enumerate(sections):
+                section = section.strip()
+                # Uzun bölümleri 1500 karakter ile böl
+                if len(section) > 1500:
+                  for i in range(0, len(section), 1300):
+                    sub = section[i:i+1500].strip()
+                    if len(sub) > 100:
+                      chunks.append({'doc_code': doc_code, 'chunk_index': len(chunks), 'content': sub})
+                elif len(section) > 100:
+                  chunks.append({'doc_code': doc_code, 'chunk_index': len(chunks), 'content': section})
+              if chunks:
+                print(f'FCOM section-based chunking: {len(chunks)} chunks')
+                return chunks
+              print('FCOM fallback to sliding window')
 
             chunk_size = 2000 if 'EASA' in doc_code else 1500
             overlap = 200
@@ -247,13 +266,11 @@ jobs:
           PDF_DIR = 'docs/pdfs'
           FLEET_JSON = 'docs/fleet.json'
 
-          # Sadece FCOM islendiyse veya tum PDF'ler islendiyse calistir
           fcom_processed = (not SPECIFIC_DOC) or (SPECIFIC_DOC == 'FCOM')
           if not fcom_processed:
             print(f'Skipping fleet extraction (not FCOM run)')
             sys.exit(0)
 
-          # FCOM.pdf bul
           fcom_path = None
           for f in os.listdir(PDF_DIR):
             if f.upper() == 'FCOM.PDF':
@@ -272,12 +289,9 @@ jobs:
             text += page.get_text()
           doc.close()
 
-          # Allocation table bolumunu bul - MSN/Registration basliklarini ara
           table_idx = -1
-          # Tum eslesimleri bul, MSN ve Registration basliklarinin gectigi yeri sec
           for pattern in [r'AIRCRAFT\s*ALLOCATION\s*TABLE', r'ALLOCATION\s*TABLE']:
             for m in re.finditer(pattern, text, re.IGNORECASE):
-              # Bu bolumde MSN ve Registration var mi kontrol et
               section = text[m.start():m.start()+5000]
               if re.search(r'\bMSN\b', section) and re.search(r'TC-[A-Z]{3}', section):
                 table_idx = m.start()
@@ -295,17 +309,13 @@ jobs:
           fleet = {}
           count = 0
 
-          # Her satir ayri: MSN, sonra TC-XXX, sonra model
-          # Ornek: '02823' / 'TC-JRA' / '321-231'
           i = 0
           while i < len(lines):
             line = lines[i].strip()
-            # MSN satiri: sadece 4-6 haneli sayi
             if re.match(r'^\d{4,6}$', line):
               n = int(line)
               if n < 1900 or n > 2099:
                 msn = line
-                # Sonraki satirlarda tescil ve model ara (max 5 satir)
                 reg = ''
                 model = ''
                 for j in range(i+1, min(i+6, len(lines))):
@@ -333,7 +343,6 @@ jobs:
             print('No aircraft parsed from allocation table')
             sys.exit(0)
 
-          # Mevcut fleet.json ile birlestir
           existing = {}
           if os.path.exists(FLEET_JSON):
             try:
