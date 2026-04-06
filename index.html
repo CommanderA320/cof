@@ -165,16 +165,12 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 16px 0;}
 .ai-context-box{background:#F8F8F8;border-radius:12px;border:1px solid #E5E5EA;padding:10px 14px;margin-bottom:12px;cursor:pointer;user-select:none;}
 .ai-context-header{display:flex;align-items:center;justify-content:space-between;}
-.ai-context-title{font-size:10px;font-weight:600;color:#8E8E93;letter-spacing:1px;text-transform:uppercase;}
 .ai-ctx-status-title{font-size:10px;font-weight:800;color:#636366;letter-spacing:1.5px;text-transform:uppercase;}
-.ai-ctx-status-title.ctx-title-loading{animation:pulse-red 0.8s infinite;}
 .ai-context-chevron{font-size:11px;color:#8E8E93;transition:transform 0.2s;}
 .ai-context-chevron.open{transform:rotate(180deg);}
 .ai-context-body{overflow:hidden;max-height:0;transition:max-height 0.25s ease;}
 .ai-context-body.open{max-height:600px;overflow-y:auto;}
 @keyframes pulse-red{0%,100%{opacity:1;}50%{opacity:0.15;}}
-.ctx-loading{animation:pulse-red 0.8s infinite;color:#E30613 !important;font-weight:800;}
-.ctx-title-loading{animation:pulse-red 0.8s infinite;}
 .ai-reg-row{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #E5E5EA;}
 .ai-reg-label{font-size:10px;font-weight:800;color:#636366;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
 .ai-reg-input{width:80px;flex:none;border:1px solid #E5E5EA;border-radius:8px;padding:6px 10px;font-size:13px;font-family:monospace;font-weight:700;color:#1C1C1E;background:#F2F2F7;outline:none;text-transform:uppercase;}
@@ -183,12 +179,6 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
 .ai-reg-badge.ok{background:#E8F5E9;color:#1A7A3A;border:1px solid #A5D6A7;}
 .ai-reg-badge.warn{background:#FFF8E1;color:#B45309;border:1px solid #FFD54F;}
 .ai-reg-badge.none{background:#F2F2F7;color:#8E8E93;border:1px solid #E5E5EA;}
-.ctx-tag.loaded{background:#EDFFF4;color:#1A7A3A;border-color:#34C759;}
-.ai-context-title{font-size:10px;font-weight:800;color:#636366;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
-.ai-context-title:before{content:'';display:block;width:8px;height:8px;background:#E30613;border-radius:50%;}
-.ai-context-tags{display:flex;flex-wrap:wrap;gap:6px;}
-.ctx-tag{background:#FFF0F0;border:1px solid #FFCDD2;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;color:#E30613;}
-.ctx-tag.doc{background:#E8F1FF;border-color:#BFDBFE;color:#1D4ED8;}
 .ai-examples{margin-bottom:12px;}
 .ai-examples-title{font-size:10px;font-weight:600;color:#8E8E93;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;}
 .ai-example-chip{background:#fff;border:1.5px solid #E5E5EA;border-radius:12px;padding:10px 14px;font-size:13px;color:#1C1C1E;cursor:pointer;margin-bottom:8px;}
@@ -429,11 +419,9 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
     </div>
     <div class="ai-context-box" onclick="toggleContext()">
       <div class="ai-context-header">
-        <span id="ai-context-title" class="ai-ctx-status-title">Sources loading...</span>
         <span id="ai-context-chevron" class="ai-context-chevron">&#x25BC;</span>
       </div>
       <div id="ai-context-body" class="ai-context-body">
-        <div id="ai-doc-tags" class="ai-context-tags" style="margin-top:8px;"></div>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -813,7 +801,7 @@ function _docAvailable(docCode){
 }
 
 // Preload all docs from GitHub into memory cache
-var _preloadDone = true;
+var _preloadDone = false;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
 
@@ -2268,6 +2256,7 @@ function _editTap(){
 // ===== EDIT OPEN/CLOSE =====
 function openEdit(){
   _editView='phases'; _editPhIdx=-1;
+  _preloadDone = false; // reset so doc status re-checks GitHub
   document.getElementById('edit-screen').className='on';
   _renderEditView();
 }
@@ -3185,36 +3174,6 @@ function openAI() {
     var saved = _ls('get','ai_registration')||'';
     if(saved) regEl.value = saved;
     setTimeout(_updateRegBadge, 100); // update badge after DOM ready
-  }
-
-  function _updateDocTags(statusMsg){
-    var tagsEl = document.getElementById('ai-doc-tags');
-    var titleEl = document.getElementById('ai-context-title');
-    if(!tagsEl) return;
-    if(statusMsg){
-      var loadedNow = REFERENCES.filter(function(r){ return _docAvailable(r.code); }).length;
-      var totalNow = REFERENCES.length;
-      tagsEl.innerHTML = '<span class="ctx-tag ctx-loading" style="color:#E30613;">⏳ '+statusMsg+'</span>';
-      if(titleEl){ titleEl.textContent = 'Sources: '+loadedNow+'/'+totalNow+' loading...'; titleEl.style.color='#E30613'; titleEl.classList.add('ctx-title-loading'); }
-      return;
-    }
-    var total = REFERENCES.length;
-    var loaded = REFERENCES.filter(function(r){ return _docAvailable(r.code); }).length;
-    if(titleEl){ var isLoading = loaded < total; titleEl.textContent = isLoading ? 'Sources: '+loaded+'/'+total+' loading...' : 'Sources ready ✓ ('+total+' docs)'; titleEl.style.color = isLoading ? '#E30613' : '#1A7A3A'; if(isLoading){ titleEl.classList.add('ctx-title-loading'); } else { titleEl.classList.remove('ctx-title-loading'); } }
-    var tags = '';
-    REFERENCES.forEach(function(ref){
-      var ok = _docAvailable(ref.code);
-      tags += '<span class="ctx-tag doc'+(ok?' loaded':'')+'" title="'+ref.code+'">'+ref.title+(ok?' ✓':'')+'</span>';
-    });
-    tagsEl.innerHTML = tags;
-  }
-
-  _updateDocTags();
-  if(!_preloadDone){
-    _preloadDocs(
-      function(msg){ _updateDocTags(msg); },
-      function(){ _updateDocTags(); }
-    );
   }
   // Parse MSN allocation table from any already-cached FCOM doc
   (function(){
