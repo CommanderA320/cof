@@ -3650,7 +3650,7 @@ async function sendQuery() {
     var searchRes = await fetch('https://cofbackend.vercel.app/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ query: queryWithMSN, limit: 20 })
+      body: JSON.stringify({ query: queryWithMSN, limit: 35, score_threshold: 0.3 })
     });
     var searchData = await searchRes.json();
     if(searchData.results && searchData.results.length > 0){
@@ -3686,7 +3686,7 @@ async function sendQuery() {
             try{
               var _sr = await fetch('https://cofbackend.vercel.app/api/search',{
                 method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({query: _term + ' ' + (msnData ? 'MSN '+msnData.msn : ''), limit: 5})
+                body: JSON.stringify({query: _term + ' ' + (msnData ? 'MSN '+msnData.msn : ''), limit: 8, score_threshold: 0.3})
               });
               if(_sr.ok){
                 var _sd = await _sr.json();
