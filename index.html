@@ -412,6 +412,36 @@ body{background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFo
       <input id="ai-reg-input" class="ai-reg-input" type="text" placeholder="TC-XXX" maxlength="8" oninput="_onRegInput(this.value)" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"/>
       <span id="ai-reg-badge" class="ai-reg-badge none">&#x2014;</span>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button id="mode-btn-scenario" onclick="setAIMode('scenario')" style="flex:1;padding:9px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:#E30613;color:#fff;border:none;">&#x26A1; SCENARIO</button>
+      <button id="mode-btn-procedure" onclick="setAIMode('procedure')" style="flex:1;padding:9px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:#F2F2F7;color:#8E8E93;border:1.5px solid #E5E5EA;">&#x1F4CB; PROCEDURE</button>
+    </div>
+    <div id="ai-loading" class="ai-loading">
+      <div class="ai-loading-spinner"></div>
+      <div style="font-size:12px;font-weight:700;color:#1C1C1E;margin-top:8px;">Analyzing scenario...</div>
+      <div id="ai-loading-sub" style="font-size:10px;color:#8E8E93;margin-top:4px;"></div>
+      <button id="ai-stop-btn" style="display:none;"></button>
+    </div>
+    <div id="ai-result" class="ai-result">
+      <div class="ai-result-header">
+        <span class="ai-result-title">OPERATIONAL ASSESSMENT</span>
+        <span id="ai-result-time" class="ai-result-time"></span>
+      </div>
+      <div id="ai-two-step-debug" style="display:none;background:#1C1C1E;color:#34C759;font-family:monospace;font-size:10px;padding:6px 10px;border-radius:6px;margin:4px 12px;">&#x1F50D; two-step retrieval: waiting...</div>
+      <div id="ai-result-body" class="ai-result-body"></div>
+      <div id="ai-result-actions" style="display:none;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #F2F2F7;">
+        <button onclick="openReport()" style="flex:1;background:#F2F2F7;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x1F4C4; Rapor</button>
+        <button onclick="shareReport()" style="flex:1;background:#F2F2F7;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:700;color:#1C1C1E;cursor:pointer;">&#x1F4E4; Paylas</button>
+      </div>
+    </div>
+    <div id="ai-history" style="margin-bottom:8px;"></div>
+    <div id="ai-examples">
+      <div class="ai-examples-title">EXAMPLE SCENARIOS</div>
+      <div class="ai-example-chip" onclick="setExample(0)">MEL + contaminated runway departure</div>
+      <div class="ai-example-chip" onclick="setExample(1)">CAT III + de-icing + fuel authority</div>
+      <div class="ai-example-chip" onclick="setExample(2)">Destination below minima + fuel state</div>
+      <div class="ai-example-chip" onclick="setExample(3)">DG + undeclared lithium batteries</div>
+    </div>
   <div class="ai-input-bar">
     <div class="ai-input-row">
       <textarea id="ai-input" class="ai-input" rows="2" placeholder="Describe your scenario: aircraft type, MEL items, weather conditions, runway, cargo, special operations..."></textarea>
