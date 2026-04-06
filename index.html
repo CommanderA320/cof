@@ -813,7 +813,7 @@ function _docAvailable(docCode){
 }
 
 // Preload all docs from GitHub into memory cache
-var _preloadDone = false;
+var _preloadDone = true;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
 
@@ -2268,7 +2268,6 @@ function _editTap(){
 // ===== EDIT OPEN/CLOSE =====
 function openEdit(){
   _editView='phases'; _editPhIdx=-1;
-  _preloadDone = false; // reset so doc status re-checks GitHub
   document.getElementById('edit-screen').className='on';
   _renderEditView();
 }
@@ -2623,25 +2622,29 @@ document.addEventListener('DOMContentLoaded',function(){
 var EMOJIS={clipboard:"clipboard",fuel:"fuel",snow:"snow",people:"people","plane-up":"plane-up",plane:"plane","plane-dn":"plane-dn",check:"check"};
 var EMOJI_CHARS={clipboard:"&#128203;",fuel:"&#9981;",snow:"&#10052;",people:"&#128101;","plane-up":"&#128747;",plane:"&#9992;","plane-dn":"&#128748;",check:"&#9989;"};
 var REFERENCES = [
-  {code:'OM_Part-A', title:'Operations Manual Part A', rev:'Rev 16', color:'#E30613'},
-  {code:'OM_Part-B', title:'Operations Manual Part B (A320)', rev:'EK_10_73_005 Rev 07', color:'#E30613'},
+  {code:'OM Part-A', title:'Operations Manual Part A', rev:'Rev 16', color:'#E30613'},
+  {code:'OM Part-B', title:'Operations Manual Part B (A320)', rev:'EK_10_73_005 Rev 07', color:'#E30613'},
   {code:'GOM', title:'Ground Operations Manual', rev:'R16 V1', color:'#FF9500'},
   {code:'SHY-6A', title:'Ticari Hava Taşıma İşletmeleri Yönetmeliği', rev:'Rev 7', color:'#007AFF'},
   {code:'AML', title:'Aircraft Maintenance Log Prosedürü', rev:'Rev 29', color:'#34C759'},
-  {code:'Dispatch_Manual', title:'Dispatch El Kitabı', rev:'Rev 6 V1', color:'#FF9500'},
+  {code:'Dispatch Manual', title:'Dispatch El Kitabı', rev:'Rev 6 V1', color:'#FF9500'},
   {code:'FCTM', title:'Flight Crew Training Manual', rev:'18 Feb 2026', color:'#E30613'},
   {code:'MEL', title:'Minimum Equipment List', rev:'Rev 64', color:'#FF3B30'},
   {code:'QRH', title:'Quick Reference Handbook', rev:'03 Dec 2025', color:'#FF3B30'},
   {code:'AFM', title:'Aircraft Flight Manual', rev:'04 Feb 2026', color:'#5856D6'},
-  {code:'De-Icing', title:'De-Icing / Anti-Icing El Kitabı', rev:'R15 V0', color:'#007AFF'},
+  {code:'De-Icing Manual', title:'De-Icing / Anti-Icing El Kitabı', rev:'R15 V0', color:'#007AFF'},
   {code:'LVO', title:'Low Visibility Operations', rev:'Rev 7', color:'#5856D6'},
-  {code:'FR_73_0001', title:'Aircraft Security Search Procedure', rev:'', color:'#FF9500'},
+  {code:'FR.73.0001', title:'Aircraft Security Search Procedure', rev:'', color:'#FF9500'},
   {code:'FCOM', title:'Flight Crew Operating Manual', rev:'', color:'#E30613'},
   {code:'CCM', title:'Cabin Crew Manual', rev:'', color:'#FF9500'},
+  {code:'Self_Dispatch_Guide_LS_73_020', title:'Self Dispatch Guide LS.73.020', rev:'', color:'#34C759'},
+  {code:'A320_GNSS_INTERFERENCE__Jamming-Spoofing__GUIDE', title:'A320 GNSS Interference Jamming-Spoofing Guide', rev:'', color:'#5856D6'},
   {code:'EASA_Easy_Access_Rules', title:'EASA Easy Access Rules', rev:'', color:'#007AFF'},
   {code:'ICAO_4444', title:'ICAO Doc 4444 - PANS-ATM', rev:'', color:'#636366'},
   {code:'ICAO_8168', title:'ICAO Doc 8168 - PANS-OPS Vol I', rev:'', color:'#636366'},
   {code:'ICAO_8168-IIII', title:'ICAO Doc 8168 - PANS-OPS Vol II', rev:'', color:'#636366'},
+  {code:'ICAO_9365_AWO', title:'ICAO Doc 9365 - All Weather Operations', rev:'', color:'#636366'},
+  {code:'ICAO_ANNEX6', title:'ICAO Annex 6 - Operation of Aircraft', rev:'', color:'#636366'},
   {code:'ICAO_Annex_2', title:'ICAO Annex 2 - Rules of the Air', rev:'', color:'#636366'},
   {code:'ICAO_Annex_6-1', title:'ICAO Annex 6 Part 1 - International Commercial Air Transport', rev:'', color:'#636366'},
 ];
