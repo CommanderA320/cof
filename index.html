@@ -801,7 +801,7 @@ function _docAvailable(docCode){
 }
 
 // Preload all docs from GitHub into memory cache
-var _preloadDone = false;
+var _preloadDone = true;
 function _preloadDocs(onStatus, onDone){
   var codes = REFERENCES.map(function(r){return r.code;});
 
@@ -2256,7 +2256,6 @@ function _editTap(){
 // ===== EDIT OPEN/CLOSE =====
 function openEdit(){
   _editView='phases'; _editPhIdx=-1;
-  _preloadDone = false; // reset so doc status re-checks GitHub
   document.getElementById('edit-screen').className='on';
   _renderEditView();
 }
@@ -3610,29 +3609,6 @@ function shareReport() {
 
 async function sendQuery() {
   // Wait for ALL documents to be preloaded before sending query
-  if(_aiMode !== 'procedure' && !_preloadDone) {
-    var _sq_input = document.getElementById('ai-input').value.trim();
-    if(_sq_input) {
-      var sendBtn = document.getElementById('ai-send-btn');
-      var resultEl = document.getElementById('ai-result-body');
-      if(sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳'; }
-      var _loaded = Object.keys(_docCache).length;
-      var _total = REFERENCES.length;
-      if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ Dokümanlar yükleniyor... ('+_loaded+'/'+_total+')<br>Lütfen bekleyin.</div>';
-      // Poll until preload done
-      var _pollInterval = setInterval(function(){
-        var _loaded2 = Object.keys(_docCache).length;
-        if(resultEl) resultEl.innerHTML = '<div style="padding:16px;color:#636366;font-size:12px;">⏳ Dokümanlar yükleniyor... ('+_loaded2+'/'+_total+')<br>Lütfen bekleyin.</div>';
-        if(_preloadDone){
-          clearInterval(_pollInterval);
-          if(sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '▶'; }
-          if(resultEl) resultEl.innerHTML = '';
-          sendQuery();
-        }
-      }, 500);
-      return;
-    }
-  }
   var input = document.getElementById("ai-input").value.trim();
   if (!input) return;
 
