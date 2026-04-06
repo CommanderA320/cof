@@ -297,44 +297,39 @@ jobs:
           fleet = {}
           count = 0
 
-          # MSN-first approach: MSN bul, yakin satirlarda tescil ve model ara
-          for i, line in enumerate(lines):
-            # MSN: satirin basinda 4-6 haneli sayi (yil degil)
-            msn_match = re.search(r'^\s*(\d{4,6})\s', line)
-            if not msn_match:
-              continue
-            n = int(msn_match.group(1))
-            if n >= 1900 and n <= 2099:
-              continue
-            msn = msn_match.group(1)
-
-            search_range = ' '.join(lines[max(0, i-2):min(len(lines), i+3)])
-
-            # Tescil: TC-XXX formati
-            reg_match = re.search(r'\b(TC-[A-Z]{3})\b', search_range)
-            if not reg_match:
-              continue
-            reg = reg_match.group(1)
-
-            # Model: 3XX-XXX formati
-            model = ''
-            model_m = re.search(r'\b(3(?:18|19|20|21)-\d{3}[A-Z]{0,2})\b', search_range)
-            if model_m:
-              model = model_m.group(1)
-
-            # Tip belirle
-            ac_type = ''
-            last = model.upper().split('-')[-1] if model else ''
-            if '321' in model:
-              ac_type = 'A321neo' if 'N' in last else 'A321ceo'
-            elif '320' in model:
-              ac_type = 'A320neo' if 'N' in last else 'A320ceo'
-            elif '319' in model:
-              ac_type = 'A319'
-
-            if reg and msn:
-              fleet[reg] = {'msn': msn, 'model': model, 'type': ac_type}
-              count += 1
+          # Her satir ayri: MSN, sonra TC-XXX, sonra model
+          # Ornek: '02823' / 'TC-JRA' / '321-231'
+          i = 0
+          while i < len(lines):
+            line = lines[i].strip()
+            # MSN satiri: sadece 4-6 haneli sayi
+            if re.match(r'^\d{4,6}$', line):
+              n = int(line)
+              if n < 1900 or n > 2099:
+                msn = line
+                # Sonraki satirlarda tescil ve model ara (max 5 satir)
+                reg = ''
+                model = ''
+                for j in range(i+1, min(i+6, len(lines))):
+                  l = lines[j].strip()
+                  if not reg and re.match(r'^TC-[A-Z]{3}$', l):
+                    reg = l
+                  if not model and re.match(r'^3(?:18|19|20|21)-\d{3}[A-Z]{0,2}$', l):
+                    model = l
+                  if reg and model:
+                    break
+                if reg and msn:
+                  ac_type = ''
+                  last = model.upper().split('-')[-1] if model else ''
+                  if '321' in model:
+                    ac_type = 'A321neo' if 'N' in last else 'A321ceo'
+                  elif '320' in model:
+                    ac_type = 'A320neo' if 'N' in last else 'A320ceo'
+                  elif '319' in model:
+                    ac_type = 'A319'
+                  fleet[reg] = {'msn': msn, 'model': model, 'type': ac_type}
+                  count += 1
+            i += 1
 
           if count == 0:
             print('No aircraft parsed from allocation table')
