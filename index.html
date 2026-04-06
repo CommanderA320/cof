@@ -1816,15 +1816,32 @@ function _parseMSNAllocationTable(docText) {
   return count;
 }
 
+// Fleet JSON — FCOM'dan otomatik guncellenir (docs/fleet.json)
+var _fleetJson = {};
+function _loadFleetJson() {
+  var url = 'https://raw.githubusercontent.com/CommanderA320/cof/main/docs/fleet.json?t=' + Date.now();
+  fetch(url).then(function(r){ return r.ok ? r.json() : null; }).then(function(data){
+    if(data && typeof data === 'object'){
+      _fleetJson = data;
+      console.log('fleet.json loaded: ' + Object.keys(data).length + ' aircraft');
+      _updateRegBadge();
+    }
+  }).catch(function(){});
+}
+
 function _getMSNForReg(registration) {
   if(!registration) return null;
-  // Fleet DB FIRST — hardcoded, always reliable
-  var ac = THY_FLEET[registration.toUpperCase().trim()];
+  var reg = registration.toUpperCase().trim();
+  // 1. Hardcoded Fleet DB (her zaman guvenilir)
+  var ac = THY_FLEET[reg];
   if(ac && ac.msn) return {msn: ac.msn, model: ac.model || ac.type};
-  // Fallback: FCOM parsed table (only if not in Fleet DB)
+  // 2. fleet.json (FCOM'dan otomatik guncellenen)
+  var fj = _fleetJson[reg];
+  if(fj && fj.msn) return {msn: fj.msn, model: fj.model, type: fj.type};
+  // 3. localStorage cache (eski FCOM parse)
   try {
     var table = JSON.parse(_ls('get','msn_allocation_table') || '{}');
-    var fcomEntry = table[registration.toUpperCase()];
+    var fcomEntry = table[reg];
     if(fcomEntry && fcomEntry.msn) return fcomEntry;
   } catch(e) {}
   return null;
@@ -4117,6 +4134,7 @@ document.addEventListener("DOMContentLoaded", function() {
       this.style.height = Math.min(this.scrollHeight, 120) + "px";
     });
   }
+  _loadFleetJson();
 });
 // ===== AI MODE =====
 var _aiMode = 'scenario';
