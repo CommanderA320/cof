@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true
+          fetch-depth: 2
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,6 +30,50 @@ jobs:
 
       - name: Install dependencies
         run: pip install pymupdf qdrant-client openai
+
+      - name: Delete removed PDFs from Qdrant
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import os, subprocess
+          from qdrant_client import QdrantClient
+          from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+          QDRANT_URL = os.environ['QDRANT_URL']
+          QDRANT_API_KEY = os.environ['QDRANT_API_KEY']
+          COLLECTION = 'documents'
+
+          # Find deleted PDF files in this commit
+          result = subprocess.run(
+            ['git', 'diff', '--name-status', 'HEAD~1', 'HEAD'],
+            capture_output=True, text=True
+          )
+
+          deleted = []
+          for line in result.stdout.splitlines():
+            if line.startswith('D') and line.endswith('.pdf') and 'docs/pdfs/' in line:
+              filename = os.path.basename(line.split('\t')[1])
+              doc_code = os.path.splitext(filename)[0]
+              deleted.append(doc_code)
+
+          if not deleted:
+            print('No deleted PDFs found')
+          else:
+            qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+            for doc_code in deleted:
+              try:
+                qdrant.delete(
+                  collection_name=COLLECTION,
+                  points_selector=Filter(
+                    must=[FieldCondition(key='doc_code', match=MatchValue(value=doc_code))]
+                  )
+                )
+                print(f'DELETED from Qdrant: {doc_code}')
+              except Exception as e:
+                print(f'Error deleting {doc_code}: {e}')
+          PYEOF
 
       - name: Extract PDFs and Embed to Qdrant
         env:
@@ -53,7 +98,6 @@ jobs:
           openai_client = OpenAI(api_key=OPENAI_KEY)
           qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
-          # Create collection and index if not exists
           try:
             qdrant.get_collection(COLLECTION)
             print(f'Collection {COLLECTION} exists')
@@ -70,14 +114,12 @@ jobs:
             )
             print('Created doc_code index')
 
-          # Ensure index exists (in case collection existed without index)
           try:
             qdrant.create_payload_index(
               collection_name=COLLECTION,
               field_name='doc_code',
               field_schema=PayloadSchemaType.KEYWORD
             )
-            print('Ensured doc_code index')
           except Exception as e:
             print(f'Index note: {e}')
 
