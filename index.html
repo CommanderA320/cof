@@ -1736,22 +1736,6 @@ function _getAircraftInfo(registration) {
 }
 
 // ===== MSN ALLOCATION TABLE PARSER =====
-// Dynamic doc_codes selector based on query content
-function _getDocCodes(query) {
-  var q = query.toUpperCase();
-  var codes = ['FCOM', 'QRH', 'MEL', 'FCTM', 'AFM', 'OM_Part-A', 'OM_Part-B'];
-  // Add CCM for cabin-related queries
-  if(q.match(/CAB|CABIN|EVACU|EMERGEN|PAX|PASSENGER|PURSER|CREW|CCM/)) codes.push('CCM');
-  // Add SHY-6A and ICAO for regulatory queries
-  if(q.match(/REGUL|ICAO|SHY|LEGAL|DISPATCH|MEL|AOC|AUTH/)) {
-    codes.push('SHY-6A');
-    codes.push('ICAO_4444');
-    codes.push('ICAO_Annex_6-1');
-    codes.push('EASA_Easy_Access_Rules');
-  }
-  return codes;
-}
-
 
 function _parseMSNAllocationTable(docText) {
   if(!docText) return 0;
@@ -3666,7 +3650,7 @@ async function sendQuery() {
     var searchRes = await fetch('https://cofbackend.vercel.app/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ query: queryWithMSN, limit: 50, score_threshold: 0.3, doc_codes: _getDocCodes(input) })
+      body: JSON.stringify({ query: queryWithMSN, limit: 50, score_threshold: 0.3 })
     });
     var searchData = await searchRes.json();
     if(searchData.results && searchData.results.length > 0){
