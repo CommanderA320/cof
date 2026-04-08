@@ -3331,7 +3331,7 @@ function formatResult(text) {
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
         : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;white-space:normal;word-break:break-word;overflow-wrap:break-word;';
-      html += '<tr>' + cells.map(function(c,ci){ var colW = '';if(!isFirst && numCols===2){ colW = ci===0?'width:38%;':'width:62%;'; }else if(!isFirst && numCols>=3 && ci===0 && firstColIsNumeric){ colW = 'width:28px;min-width:28px;max-width:28px;'; }return '<'+tag+' style="'+style+colW+'">' + c.trim() + '</'+tag+'>'; }).join('') + '</tr>';
+      html += '<tr>' + cells.map(function(c,ci){ var colW = '';if(!isFirst && numCols===2){ colW = ci===0?'width:38%;':'width:62%;'; }else if(!isFirst && numCols===4){ var w4=['30%','14%','16%','40%']; colW='width:'+w4[ci]+';'; }else if(!isFirst && numCols>=3 && ci===0 && firstColIsNumeric){ colW = 'width:28px;min-width:28px;max-width:28px;'; }return '<'+tag+' style="'+style+colW+'">' + c.trim() + '</'+tag+'>'; }).join('') + '</tr>';
       isFirst = false;
     });
     html += '</table>';
