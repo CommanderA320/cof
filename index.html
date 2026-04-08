@@ -3313,7 +3313,9 @@ function formatResult(text) {
   text = text.replace(/((?:[ \t]*\|.+\|[ \t]*\n)+)/g, function(block){
     var rows = block.trim().split('\n').filter(function(r){ return r.trim(); });
     if(rows.length < 1) return block;
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;">';
+    var colCount = rows.filter(function(r){ return !/^\s*\|[-:\s|]+\|\s*$/.test(r) && r.trim(); }).length > 0 ? (rows.find(function(r){ return !/^\s*\|[-:\s|]+\|\s*$/.test(r) && r.trim(); }) || '').split('|').filter(function(c,i,a){ return i>0&&i<a.length-1; }).length : 1;
+    var tblStyle = colCount >= 4 ? 'width:100%;border-collapse:collapse;font-size:9px;margin:8px 0;' : 'width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;';
+    var html = '<table style="' + tblStyle + '">';
     var isFirst = true;
     var numCols = 0;
     rows.forEach(function(row){
@@ -3325,8 +3327,8 @@ function formatResult(text) {
       var tag = isFirst ? 'th' : 'td';
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
-        : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;';
-      html += '<tr>' + cells.map(function(c,ci){ var cs = style + (isFirst ? '' : (ci===0 ? 'width:35%;white-space:normal;word-break:break-word;overflow-wrap:break-word;' : 'white-space:normal;word-break:break-word;overflow-wrap:break-word;')); return '<'+tag+' style="'+cs+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';
+        : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;white-space:normal;word-break:break-word;overflow-wrap:break-word;';
+      html += '<tr>' + cells.map(function(c,ci){ var colW = '';if(!isFirst && numCols===2){ colW = ci===0?'width:38%;':'width:62%;'; }else if(!isFirst && numCols>=3 && ci===0){ colW = 'width:28px;min-width:28px;max-width:28px;'; }return '<'+tag+' style="'+style+colW+'">' + c.trim() + '</'+tag+'>'; }).join('') + '</tr>';
       isFirst = false;
     });
     html += '</table>';
