@@ -3318,17 +3318,20 @@ function formatResult(text) {
     var html = '<table style="' + tblStyle + '">';
     var isFirst = true;
     var numCols = 0;
+    var firstColHeader = '';
+    var firstColIsNumeric = false;
     rows.forEach(function(row){
       // Skip separator rows: lines like |---|---|---| or |:---|:---:|
       if(/^\s*\|[-:\s|]+\|\s*$/.test(row)) return;
       var cells = row.split('|').filter(function(c,i,a){ return i>0 && i<a.length-1; });
       if(!cells.length) return;
       if(numCols === 0) numCols = cells.length;
+      if(isFirst && cells.length > 0){ firstColHeader = cells[0].trim().toLowerCase(); firstColIsNumeric = /^(option|#|no\.|nr\.?)$/i.test(firstColHeader); }
       var tag = isFirst ? 'th' : 'td';
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
         : 'padding:4px 6px;border-bottom:1px solid #E5E5EA;color:#1C1C1E;vertical-align:top;white-space:normal;word-break:break-word;overflow-wrap:break-word;';
-      html += '<tr>' + cells.map(function(c,ci){ var colW = '';if(!isFirst && numCols===2){ colW = ci===0?'width:38%;':'width:62%;'; }else if(!isFirst && numCols>=3 && ci===0){ colW = 'width:28px;min-width:28px;max-width:28px;'; }return '<'+tag+' style="'+style+colW+'">' + c.trim() + '</'+tag+'>'; }).join('') + '</tr>';
+      html += '<tr>' + cells.map(function(c,ci){ var colW = '';if(!isFirst && numCols===2){ colW = ci===0?'width:38%;':'width:62%;'; }else if(!isFirst && numCols>=3 && ci===0 && firstColIsNumeric){ colW = 'width:28px;min-width:28px;max-width:28px;'; }return '<'+tag+' style="'+style+colW+'">' + c.trim() + '</'+tag+'>'; }).join('') + '</tr>';
       isFirst = false;
     });
     html += '</table>';
