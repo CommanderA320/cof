@@ -3315,11 +3315,13 @@ function formatResult(text) {
     if(rows.length < 1) return block;
     var html = '<table style="width:100%;border-collapse:collapse;font-size:10px;margin:8px 0;">';
     var isFirst = true;
+    var numCols = 0;
     rows.forEach(function(row){
       // Skip separator rows: lines like |---|---|---| or |:---|:---:|
       if(/^\s*\|[-:\s|]+\|\s*$/.test(row)) return;
       var cells = row.split('|').filter(function(c,i,a){ return i>0 && i<a.length-1; });
       if(!cells.length) return;
+      if(numCols === 0) numCols = cells.length;
       var tag = isFirst ? 'th' : 'td';
       var style = isFirst
         ? 'background:#1C1C1E;color:#fff;font-weight:700;padding:4px 5px;text-align:left;'
@@ -4143,4 +4145,4 @@ var CAB_PR_SYS_1_2_FAULT_PROC = [
   'INOP SYS: CAB PR 1+2'
 ].join('\n');
 
->
+var colWidth = numCols === 2 ? (ci===0 ? 'width:38%;' : 'width:62%;') : ''; var tdBase = style + 'white-space:normal;word-break:break-word;overflow-wrap:break-word;'; html += '<tr>' + cells.map(function(c,ci){ return '<'+tag+' style="'+tdBase+(isFirst?'':colWidth)+'">'+c.trim()+'</'+tag+'>'; }).join('') + '</tr>';>
