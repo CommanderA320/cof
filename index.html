@@ -2251,7 +2251,7 @@ function _editTap(){
   _editTaps++;
   clearTimeout(_editTimer);
   if(_editTaps>=5){ _editTaps=0; openEdit(); return; }
-  _editTimer = setTimeout(function(){ _editTaps=0; }, 2000);
+  _editTimer = setTimeout(function(){ _editTaps=0; }, 5000);
 }
 
 // ===== EDIT OPEN/CLOSE =====
