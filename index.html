@@ -3692,8 +3692,11 @@ async function sendQuery() {
       var byDoc = {};
       searchData.results.forEach(function(r){
         if(r.image_b64){
-          // Skip small images (THY logo ~15K, real diagrams >40K base64 chars)
-          if(r.image_b64.length < 40000) return;
+          // Skip very small images only (pure logos <5K)
+          if(r.image_b64.length < 5000) return;
+          // Skip if caption mentions THY logo
+          var _capCheck = (r.content || '').toLowerCase();
+          if(_capCheck.indexOf('türk hava') > -1 || _capCheck.indexOf('turkish airlines logo') > -1) return;
           // Dedup: same visual = same b64 start
           var _imgHash = r.image_b64.substring(0, 300);
           var _isDupImg = _imageResults.some(function(x){ return x.image_b64.substring(0, 300) === _imgHash; });
