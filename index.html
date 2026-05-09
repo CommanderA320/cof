@@ -3697,6 +3697,8 @@ async function sendQuery() {
           if(_cap.indexOf('header section') > -1) return;
           if(_cap.indexOf('header and opening') > -1) return;
           if(_cap.indexOf('türk hava yollar') > -1) return;
+          if(_cap.indexOf('flight crew operating manual page showing') > -1) return;
+          if(_cap.indexOf('overspeed prevention') > -1) return;
           var _imgHash = r.image_b64.substring(0, 300);
           var _isDup = _imageResults.some(function(x){ return x.image_b64.substring(0, 300) === _imgHash; });
           if(!_isDup) _imageResults.push(r);
