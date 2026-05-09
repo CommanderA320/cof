@@ -3692,15 +3692,14 @@ async function sendQuery() {
       var byDoc = {};
       searchData.results.forEach(function(r){
         if(r.image_b64){
-          // Skip very small images only (pure logos <5K)
-          if(r.image_b64.length < 5000) return;
-          // Skip if caption mentions THY logo
-          var _capCheck = (r.content || '').toLowerCase();
-          if(_capCheck.indexOf('türk hava') > -1 || _capCheck.indexOf('turkish airlines logo') > -1) return;
-          // Dedup: same visual = same b64 start
+          var _cap = (r.content || '').toLowerCase();
+          if(_cap.indexOf('header page') > -1) return;
+          if(_cap.indexOf('header section') > -1) return;
+          if(_cap.indexOf('header and opening') > -1) return;
+          if(_cap.indexOf('türk hava yollar') > -1) return;
           var _imgHash = r.image_b64.substring(0, 300);
-          var _isDupImg = _imageResults.some(function(x){ return x.image_b64.substring(0, 300) === _imgHash; });
-          if(!_isDupImg) _imageResults.push(r);
+          var _isDup = _imageResults.some(function(x){ return x.image_b64.substring(0, 300) === _imgHash; });
+          if(!_isDup) _imageResults.push(r);
           return;
         }
         if(!byDoc[r.doc_code]) byDoc[r.doc_code] = [];
