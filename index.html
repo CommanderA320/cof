@@ -3692,7 +3692,9 @@ async function sendQuery() {
       var byDoc = {};
       searchData.results.forEach(function(r){
         if(r.image_b64){
-          if(r.doc_code === 'FCOM_IMG') return;
+          // Skip small images (THY logo ~15K, real diagrams >40K base64 chars)
+          if(r.image_b64.length < 40000) return;
+          // Dedup: same visual = same b64 start
           var _imgHash = r.image_b64.substring(0, 300);
           var _isDupImg = _imageResults.some(function(x){ return x.image_b64.substring(0, 300) === _imgHash; });
           if(!_isDupImg) _imageResults.push(r);
@@ -3997,8 +3999,6 @@ async function sendQuery() {
   if(_imageResults.length > 0){
     var _blocks = [{type: 'text', text: finalContent}];
     _imageResults.forEach(function(img){
-      var _capLow2 = (img.content || '').toLowerCase();
-      if(_capLow2.indexOf('header page') > -1 || _capLow2.indexOf('header section') > -1 || _capLow2.indexOf('header and opening') > -1) return;
       var _mt = (img.image_b64.charAt(0) === 'i') ? 'image/png' : 'image/jpeg';
       _blocks.push({type: 'image', source: {type: 'base64', media_type: _mt, data: img.image_b64}});
       _blocks.push({type: 'text', text: '[DIAGRAM: ' + (img.source_ref || img.doc_code) + '] ' + (img.content || '')});
@@ -4042,8 +4042,6 @@ async function sendQuery() {
         var _gHtml = '<div style="margin-top:18px;border-top:1px solid #E5E5EA;padding-top:12px;">';
         _gHtml += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">REFERENCED DIAGRAMS</div>';
         _imageResults.forEach(function(img){
-          var _capLow = (img.content || '').toLowerCase();
-          if(_capLow.indexOf('header page') > -1 || _capLow.indexOf('header section') > -1 || _capLow.indexOf('header and opening') > -1) return;
           var _mt = (img.image_b64.charAt(0) === 'i') ? 'image/png' : 'image/jpeg';
           _gHtml += '<div style="margin-bottom:14px;">';
           _gHtml += '<img src="data:'+_mt+';base64,'+img.image_b64+'" style="max-width:100%;border-radius:6px;border:1px solid #E5E5EA;display:block;" />';
