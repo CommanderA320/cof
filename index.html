@@ -3693,9 +3693,9 @@ async function sendQuery() {
       searchData.results.forEach(function(r){
         if(r.image_b64){
           if(r.doc_code === 'FCOM_IMG') return;
-          var _capKey = (r.content || '').substring(0, 80).toLowerCase();
-          var _isCapDup = _imageResults.some(function(x){ return (x.content || '').substring(0, 80).toLowerCase() === _capKey; });
-          if(!_isCapDup) _imageResults.push(r);
+          var _imgHash = r.image_b64.substring(0, 300);
+          var _isDupImg = _imageResults.some(function(x){ return x.image_b64.substring(0, 300) === _imgHash; });
+          if(!_isDupImg) _imageResults.push(r);
           return;
         }
         if(!byDoc[r.doc_code]) byDoc[r.doc_code] = [];
