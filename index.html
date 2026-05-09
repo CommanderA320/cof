@@ -3655,6 +3655,7 @@ async function sendQuery() {
   // BM25: pick most relevant chunks from loaded docs (skip for offline procedure mode)
   var docContext = '';
   var melContext = '';
+  var _imageResults = [];
   if(_aiMode === 'procedure') {
     // Handled below in offline procedure branch — skip all API prep
   }
@@ -3687,9 +3688,13 @@ async function sendQuery() {
     });
     var searchData = await searchRes.json();
     if(searchData.results && searchData.results.length > 0){
-      // Group by doc, build context string
+      // Group by doc, build context string; separate image results for vision
       var byDoc = {};
       searchData.results.forEach(function(r){
+        if(r.image_b64){
+          _imageResults.push(r);
+          return;
+        }
         if(!byDoc[r.doc_code]) byDoc[r.doc_code] = [];
         byDoc[r.doc_code].push('[SOURCE: ' + r.doc_code + ']\n' + r.content);
       });
@@ -3984,6 +3989,20 @@ async function sendQuery() {
   // Final guard — never send empty content
   var finalContent = (userContent && userContent.trim()) ? userContent : ('A320 Turkish Airlines. Query: ' + input);
 
+  // Build user message — multimodal if image results are available
+  var _userMsg;
+  if(_imageResults.length > 0){
+    var _blocks = [{type: 'text', text: finalContent}];
+    _imageResults.forEach(function(img){
+      var _mt = (img.image_b64.charAt(0) === 'i') ? 'image/png' : 'image/jpeg';
+      _blocks.push({type: 'image', source: {type: 'base64', media_type: _mt, data: img.image_b64}});
+      _blocks.push({type: 'text', text: '[DIAGRAM: ' + (img.source_ref || img.doc_code) + '] ' + (img.content || '')});
+    });
+    _userMsg = {role: 'user', content: _blocks};
+  } else {
+    _userMsg = {role: 'user', content: finalContent};
+  }
+
   fetch("https://cofbackend.vercel.app/api/query", {
     method: "POST",
     signal: _currentAbort ? _currentAbort.signal : undefined,
@@ -3995,7 +4014,7 @@ async function sendQuery() {
       max_tokens: 16000,
       stream: true,
       system: [{type: "text", text: systemMsg || 'A320 Commander assistant.', cache_control: {type: "ephemeral"}}],
-      messages: [{role: "user", content: finalContent}]
+      messages: [_userMsg]
     })
   })
   .then(function(r) {
@@ -4013,6 +4032,22 @@ async function sendQuery() {
       _setSendMode(true);
       // Final render
       document.getElementById("ai-result-body").innerHTML = formatResult(streamedText);
+      // Append referenced diagrams gallery
+      if(_imageResults && _imageResults.length > 0){
+        var _gHtml = '<div style="margin-top:18px;border-top:1px solid #E5E5EA;padding-top:12px;">';
+        _gHtml += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">REFERENCED DIAGRAMS</div>';
+        _imageResults.forEach(function(img){
+          var _mt = (img.image_b64.charAt(0) === 'i') ? 'image/png' : 'image/jpeg';
+          _gHtml += '<div style="margin-bottom:14px;">';
+          _gHtml += '<img src="data:'+_mt+';base64,'+img.image_b64+'" style="max-width:100%;border-radius:6px;border:1px solid #E5E5EA;display:block;" />';
+          _gHtml += '<div style="font-size:10px;color:#8E8E93;margin-top:4px;line-height:1.4;">';
+          _gHtml += '<strong>' + (img.source_ref || img.doc_code) + '</strong>';
+          if(img.content) _gHtml += ' — ' + img.content.substring(0, 140);
+          _gHtml += '</div></div>';
+        });
+        _gHtml += '</div>';
+        document.getElementById("ai-result-body").innerHTML += _gHtml;
+      }
       // Show PDF/Share buttons
       var actEl = document.getElementById("ai-result-actions");
       if(actEl){ actEl.style.display = "flex"; }
