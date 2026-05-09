@@ -3692,7 +3692,9 @@ async function sendQuery() {
       var byDoc = {};
       searchData.results.forEach(function(r){
         if(r.image_b64){
-          _imageResults.push(r);
+          var _pageKey = String(r.page_num || '') + '_' + String(r.doc_code || '');
+          var _isDup = _imageResults.some(function(x){ return String(x.page_num || '') + '_' + String(x.doc_code || '') === _pageKey; });
+          if(!_isDup) _imageResults.push(r);
           return;
         }
         if(!byDoc[r.doc_code]) byDoc[r.doc_code] = [];
@@ -4042,7 +4044,7 @@ async function sendQuery() {
           _gHtml += '<img src="data:'+_mt+';base64,'+img.image_b64+'" style="max-width:100%;border-radius:6px;border:1px solid #E5E5EA;display:block;" />';
           _gHtml += '<div style="font-size:10px;color:#8E8E93;margin-top:4px;line-height:1.4;">';
           _gHtml += '<strong>' + (img.source_ref || img.doc_code) + '</strong>';
-          if(img.content) _gHtml += ' — ' + img.content.substring(0, 140);
+          if(img.content) _gHtml += ' — ' + img.content;
           _gHtml += '</div></div>';
         });
         _gHtml += '</div>';
