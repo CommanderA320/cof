@@ -3684,7 +3684,7 @@ async function sendQuery() {
     var searchRes = await fetch('https://cofbackend.vercel.app/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ query: queryWithMSN, limit: 50, score_threshold: 0.3 })
+      body: JSON.stringify({ query: queryWithMSN, limit: 50, score_threshold: 0.3, msn: (msnData && msnData.msn) ? msnData.msn : undefined })
     });
     var searchData = await searchRes.json();
     if(searchData.results && searchData.results.length > 0){
