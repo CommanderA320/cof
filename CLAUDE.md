@@ -48,6 +48,7 @@ EASA_Easy_Access_Rules×5, Dispatch_Manual×3, FCOM_IMG×3, FCTM_IMG×2
 - **AI_SYSTEM:** Asla compress etme. Byte count değişiklik öncesi/sonrası doğrula.
 - **Qdrant:** doc_code field'ı kullan (source değil)
 - **Tüm kaynaklar her sorguda aranır** — dynamic filtering yok
+- **Yeni script dosyası = sor, sessizce bırakma:** `scripts/` içinde ya da başka bir yerde yeni bir Python/JS script dosyası oluşturulduğunda, o iş bitince kullanıcıya "bu dosyayı commit+push etmemi ister misin" diye sorulmalı. Untracked script asla sessizce bırakılmaz (2026-09-11: embed_doc.py, image_captioning_rag.py ve 2 diğer script haftalarca untracked kalmış, fark edilmesi tesadüf olmuştu).
 
 ## Bilinen Sorunlar
 - FCOM_IMG v1 chunk'ları THY logosu içeriyor — v2 script (image_captioning_rag.py) çalışıyor, bitince silinecek
