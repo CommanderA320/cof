@@ -1,9 +1,13 @@
 name: Embed Documents
 
 on:
-  push:
-    paths:
-      - 'docs/pdfs/**'
+  # push tetikleyicisi kasıtlı olarak kaldırıldı (2026-09-12): lfs:false
+  # yüzünden checkout sadece LFS pointer dosyalarını çekiyor (gerçek PDF
+  # binary'si değil), ayrıca her push TÜM docs/pdfs/'i (477MB, ~13k FCOM
+  # chunk'ı dahil) yeniden embed ediyor ve eski/güncel-olmayan chunking
+  # mantığı kullanıyor (QRH ident-chunker'ı, Dispatch_Manual özel işlemini
+  # ve FCOM_IMG/FCTM_IMG captioning'i kapsamıyor). Bunlar düzeltilene kadar
+  # sadece manuel workflow_dispatch ile çalıştırılmalı.
   workflow_dispatch:
     inputs:
       doc_code:
