@@ -46,12 +46,11 @@ QDRANT_API_KEY    = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME   = "documents"
 EMBEDDING_MODEL   = "text-embedding-3-small"
 EMBEDDING_DIM     = 1536
-CLAUDE_MODEL      = "claude-sonnet-4-6"
+CLAUDE_MODEL      = "claude-sonnet-5"
 
-# Only process FCOM — FCTM is already done correctly
 PDF_MAP = {
     "FCOM": Path("docs/pdfs/FCOM.pdf"),
-    # "FCTM": Path("docs/pdfs/FCTM.pdf"),  # already done, skip
+    "FCTM": Path("docs/pdfs/FCTM.pdf"),
 }
 
 # Separate checkpoint for v2 (full-page render approach)
@@ -240,6 +239,10 @@ def process_pdf(
 
     doc = fitz.open(str(pdf_path))
     total_pages = doc.page_count
+    test_max_pages = int(os.environ.get("TEST_MAX_PAGES", "0"))
+    if test_max_pages:
+        total_pages = min(total_pages, test_max_pages)
+        print(f"[TEST MODE] Limiting to first {total_pages} pages (TEST_MAX_PAGES={test_max_pages})")
     print(f"Total pages: {total_pages}")
 
     skipped_no_content = 0
@@ -345,6 +348,11 @@ def process_pdf(
         processed += 1
         save_checkpoint(done)
         print(f"    [ok] Page {page_num} upserted.")
+
+        if page_num % 50 == 0:
+            print(f"  [progress] {doc_code} Page {page_num}/{total_pages} — "
+                  f"processed={processed}, skipped_no_content={skipped_no_content}, "
+                  f"skipped_logo={skipped_logo}")
 
         time.sleep(0.1)  # polite rate-limit buffer
 
