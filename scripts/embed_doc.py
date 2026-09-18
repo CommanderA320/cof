@@ -5,7 +5,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, PayloadSchemaType
 
 if len(sys.argv) != 2:
-  print('Usage: python3 scripts/embed_doc.py <doc_code>')
+  print('Usage: python3 scripts/embed_doc.py <doc_code>[,<doc_code2>,...]')
   sys.exit(1)
 
 load_dotenv()
@@ -13,7 +13,9 @@ load_dotenv()
 QDRANT_URL = os.environ['QDRANT_URL']
 QDRANT_API_KEY = os.environ['QDRANT_API_KEY']
 OPENAI_KEY = os.environ['OPENAI_API_KEY']
-SPECIFIC_DOC = sys.argv[1].strip()
+# Geriye dönük uyumlu: tek bir doc_code ("FCOM") eskisi gibi çalışır.
+# Virgülle ayrılmış birden fazla doc_code de ("FCOM,AFM,MEL") kabul edilir.
+SPECIFIC_DOCS = {d.strip().upper() for d in sys.argv[1].split(',') if d.strip()}
 PDF_DIR = 'docs/pdfs'
 COLLECTION = 'documents'
 
@@ -50,8 +52,8 @@ def get_pdfs():
     print('No docs/pdfs folder')
     return []
   files = [f for f in os.listdir(PDF_DIR) if f.lower().endswith('.pdf')]
-  if SPECIFIC_DOC:
-    files = [f for f in files if os.path.splitext(f)[0].upper() == SPECIFIC_DOC.upper()]
+  if SPECIFIC_DOCS:
+    files = [f for f in files if os.path.splitext(f)[0].upper() in SPECIFIC_DOCS]
   return files
 
 def extract_text(pdf_path):
