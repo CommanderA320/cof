@@ -373,7 +373,10 @@ def main() -> None:
         print(f"[error] Missing env vars: {', '.join(missing)}")
         sys.exit(1)
 
-    anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    # Varsayılan SDK timeout'u (10 dk) tek bir sayfayı ~20 dk'ya kadar
+    # (1 retry dahil) kilitleyebiliyordu — 2026-09-18'de FCTM run'ında
+    # gözlemlendi. Açık, kısa bir timeout ile bu süreyi sınırlıyoruz.
+    anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=90.0)
     openai_client    = OpenAI(api_key=OPENAI_API_KEY)
 
     qdrant_kwargs = {"url": QDRANT_URL}
