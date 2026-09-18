@@ -124,7 +124,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pymupdf qdrant-client openai python-dotenv
+        run: pip install pymupdf qdrant-client openai python-dotenv anthropic
 
       - name: Delete removed PDFs from Qdrant
         env:
