@@ -1,0 +1,126 @@
+name: Caption Images (manual, costly)
+
+# SADECE elle tetiklenir. embed.yml'den ASLA çağrılmaz, push tetikleyicisi
+# YOK. FCOM/FCTM görsellerinin İLK kez ya da TAMAMEN yeniden captioning'i
+# içindir — sayfa tavanı YOK (caption_images_gated.py'nin aksine), tüm
+# değişen/yeni sayfaları işler. Maliyet: FCOM için ~$60-100, FCTM için
+# ~$5 civarı (bkz. 2026-09 ölçümleri).
+on:
+  workflow_dispatch:
+    inputs:
+      doc_code:
+        description: 'Hangi doküman (FCOM veya FCTM)'
+        required: true
+        type: choice
+        options:
+          - FCOM
+          - FCTM
+      confirm:
+        description: 'Bu işlem $60-100''a kadar tutabilir — onaylamak için tam olarak YES yaz'
+        required: true
+
+jobs:
+  caption:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "YES" ]; then
+            echo "Onay verilmedi (confirm='${{ github.event.inputs.confirm }}', 'YES' bekleniyor)."
+            echo "Hiçbir işlem yapılmadı, çıkılıyor."
+            exit 1
+          fi
+          echo "Onaylandı — ${{ github.event.inputs.doc_code }} için tam görsel captioning başlıyor."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pymupdf qdrant-client openai python-dotenv anthropic
+
+      # image_captioning_rag.py'nin PDF_MAP'i her zaman FCOM+FCTM'in ikisini
+      # birden işler, tek bir doc_code seçme mekanizması yok. Burada, script
+      # dosyasına dokunmadan, çalışma zamanında PDF_MAP'i sadece seçilen
+      # doc_code'a daraltıyoruz — "doğrudan çağırma" niyetini bozmadan
+      # doc_code input'unu gerçekten anlamlı kılıyor.
+      - name: Run full image captioning (no page ceiling — manual/initial run)
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DOC_CODE: ${{ github.event.inputs.doc_code }}
+        run: |
+          python3 << 'PYEOF'
+          import os, sys
+          sys.path.insert(0, 'scripts')
+          import image_captioning_rag as m
+
+          doc_code = os.environ['DOC_CODE']
+          if doc_code not in m.PDF_MAP:
+            print(f"[error] {doc_code} PDF_MAP'te yok: {list(m.PDF_MAP.keys())}")
+            sys.exit(1)
+
+          m.PDF_MAP = {doc_code: m.PDF_MAP[doc_code]}
+          m.main()
+          PYEOF
+
+      # caption_images_gated.py'nin (embed.yml üzerinden gelen otomatik
+      # tetiklemelerin) kullandığı .page_hashes_v1.json formatını, bu tam
+      # işlemenin sonucuyla dolduruyoruz. Böylece bir sonraki otomatik
+      # tetikleme, bu sayfaları "zaten bu haliyle işlendi" olarak görüp
+      # sadece GERÇEKTEN değişen sayfaları işler.
+      - name: Seed hash checkpoint for future automatic runs
+        env:
+          DOC_CODE: ${{ github.event.inputs.doc_code }}
+        run: |
+          python3 << 'PYEOF'
+          import os, sys
+          sys.path.insert(0, 'scripts')
+          import fitz
+          from image_captioning_rag import PDF_MAP, render_page, page_has_content
+          from caption_images_gated import hash_page, load_page_hashes, save_page_hashes
+
+          doc_code = os.environ['DOC_CODE']
+          pdf_path = PDF_MAP[doc_code]
+
+          doc = fitz.open(str(pdf_path))
+          doc_hashes = {}
+          for page_index in range(doc.page_count):
+            page_num = page_index + 1
+            page = doc.load_page(page_index)
+            if not page_has_content(page):
+              continue
+            doc_hashes[str(page_num)] = hash_page(render_page(page))
+          doc.close()
+
+          all_hashes = load_page_hashes()
+          all_hashes[doc_code] = doc_hashes
+          save_page_hashes(all_hashes)
+          print(f"[seed] {doc_code}: {len(doc_hashes)} sayfanın hash'i .page_hashes_v1.json'a yazıldı")
+          PYEOF
+
+      # Checkpoint dosyaları CI runner'ının geçici dosya sisteminde —
+      # commit edilmezse bu run bittiğinde tamamen kaybolur ve bir
+      # sonraki otomatik tetikleme hiçbir şey "zaten yapılmış" göremez.
+      - name: Commit checkpoint files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/pdfs/.image_caption_checkpoint_v2.json docs/pdfs/.page_hashes_v1.json
+          if git diff --staged --quiet; then
+            echo "Checkpoint'te değişiklik yok, commit edilmiyor"
+          else
+            git commit -m "Update image captioning checkpoints for ${{ github.event.inputs.doc_code }} (manual full run via caption-images.yml)"
+            git push
+          fi
