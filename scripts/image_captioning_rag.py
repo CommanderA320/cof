@@ -32,6 +32,8 @@ from qdrant_client.http.models import (
     VectorParams,
 )
 
+sys.stdout.reconfigure(line_buffering=True)  # arka planda/CI'da çalışırken print'lerin anında görünmesi için
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
