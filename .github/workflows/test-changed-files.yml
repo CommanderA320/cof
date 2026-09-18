@@ -1,0 +1,59 @@
+name: TEST - Changed Files Detection (isolated, no embed logic)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed docs/pdfs files
+        run: |
+          echo "github.event.before = ${{ github.event.before }}"
+          echo "github.sha          = ${{ github.sha }}"
+
+          BEFORE="${{ github.event.before }}"
+          ZERO="0000000000000000000000000000000000000000"
+
+          if [ "$BEFORE" = "$ZERO" ] || [ -z "$BEFORE" ]; then
+            echo "İlk push ya da 'before' SHA'sı yok — HEAD~1 ile karşılaştırılıyor (fallback)."
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              COMPARE_FROM="HEAD~1"
+            else
+              echo "Karşılaştırılacak önceki commit yok (repo'nun ilk commit'i). Değişen dosya yok kabul ediliyor."
+              echo "changed_pdfs=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            COMPARE_FROM="$BEFORE"
+          fi
+
+          echo "Karşılaştırma: $COMPARE_FROM -> ${{ github.sha }}"
+          echo ""
+          echo "=== docs/pdfs/ altında değişen (added/modified) dosyalar ==="
+          CHANGED=$(git diff --name-only --diff-filter=AM "$COMPARE_FROM" "${{ github.sha }}" -- 'docs/pdfs/*.pdf' 'docs/pdfs/*.PDF')
+
+          if [ -z "$CHANGED" ]; then
+            echo "(hiçbiri — bu push docs/pdfs/ içinde PDF eklemedi/değiştirmedi)"
+          else
+            echo "$CHANGED"
+          fi
+
+          echo ""
+          echo "=== docs/pdfs/ altında SİLİNEN dosyalar (referans, ayrı adımda kullanılacak) ==="
+          DELETED=$(git diff --name-only --diff-filter=D "$COMPARE_FROM" "${{ github.sha }}" -- 'docs/pdfs/*.pdf' 'docs/pdfs/*.PDF')
+          if [ -z "$DELETED" ]; then
+            echo "(hiçbiri)"
+          else
+            echo "$DELETED"
+          fi
+
+          echo ""
+          echo "=== Bu push'ta değişen TÜM dosyalar (genel doğrulama için) ==="
+          git diff --name-status "$COMPARE_FROM" "${{ github.sha }}"
