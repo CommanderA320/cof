@@ -213,7 +213,7 @@ def main():
         print("        Hiçbir sayfa işlenmedi (sıfır API maliyeti). "
               "Bu kadar çok değişiklik beklenmiyor — elle inceleyip "
               "gerekirse scripts/image_captioning_rag.py'yi manuel çalıştırın.")
-        sys.exit(1)
+        sys.exit(0)  # bilinçli güvenlik durdurması, hata değil
 
     # --- Aşama 3: aylık bütçe kontrolü (hâlâ ücretsiz) ---
     spend = load_spend()
@@ -221,7 +221,7 @@ def main():
         print(f"[abort] Bu ayki ({spend['month']}) bütçe (${MONTHLY_BUDGET_USD:.2f}) "
               f"zaten aşılmış (${spend['spend_usd']:.2f} harcanmış). "
               "Hiçbir sayfa işlenmedi. Yeni ayda otomatik sıfırlanacak.")
-        sys.exit(1)
+        sys.exit(0)  # bilinçli güvenlik durdurması, hata değil
 
     print(f"[budget] Bu ay ({spend['month']}) şu ana kadar: ${spend['spend_usd']:.2f} / "
           f"${MONTHLY_BUDGET_USD:.2f}")
