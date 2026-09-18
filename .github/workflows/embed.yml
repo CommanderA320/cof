@@ -24,8 +24,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: false
-          fetch-depth: 2
+          lfs: true
+          fetch-depth: 0
+
+      # test-changed-files.yml'de izole şekilde doğrulanmış tespit mantığı
+      # (bkz. run'lar: 35380703146, 35380838750). Şimdilik sadece bir output
+      # üretiyor — henüz hiçbir sonraki adım bu output'u kullanmıyor.
+      - name: Detect changed docs/pdfs files
+        id: detect_changes
+        run: |
+          echo "github.event.before = ${{ github.event.before }}"
+          echo "github.sha          = ${{ github.sha }}"
+
+          BEFORE="${{ github.event.before }}"
+          ZERO="0000000000000000000000000000000000000000"
+
+          if [ "$BEFORE" = "$ZERO" ] || [ -z "$BEFORE" ]; then
+            echo "İlk push ya da 'before' SHA'sı yok — HEAD~1 ile karşılaştırılıyor (fallback)."
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              COMPARE_FROM="HEAD~1"
+            else
+              echo "Karşılaştırılacak önceki commit yok. Değişen dosya yok kabul ediliyor."
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
+              echo "changed_doc_codes<<EOF" >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            COMPARE_FROM="$BEFORE"
+          fi
+
+          echo "Karşılaştırma: $COMPARE_FROM -> ${{ github.sha }}"
+
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM "$COMPARE_FROM" "${{ github.sha }}" -- 'docs/pdfs/*.pdf' 'docs/pdfs/*.PDF')
+          DELETED_FILES=$(git diff --name-only --diff-filter=D "$COMPARE_FROM" "${{ github.sha }}" -- 'docs/pdfs/*.pdf' 'docs/pdfs/*.PDF')
+
+          echo "=== Değişen (added/modified) PDF'ler ==="
+          echo "${CHANGED_FILES:-(hiçbiri)}"
+          echo "=== Silinen PDF'ler ==="
+          echo "${DELETED_FILES:-(hiçbiri)}"
+
+          # Dosya adlarını doc_code'a çevir (docs/pdfs/ öneki + .pdf uzantısı atılır)
+          DOC_CODES=$(echo "$CHANGED_FILES" | sed -E 's#^docs/pdfs/##; s#\.[Pp][Dd][Ff]$##' | grep -v '^$' || true)
+
+          echo "=== Değişen doc_code'lar ==="
+          echo "${DOC_CODES:-(hiçbiri)}"
+
+          if [ -z "$DOC_CODES" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "changed_doc_codes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DOC_CODES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Setup Python
         uses: actions/setup-python@v5
