@@ -204,6 +204,26 @@ jobs:
             fi
           done
 
+      # caption_images_gated.py çalıştıysa .page_hashes_v1.json ve/veya
+      # .monthly_image_caption_spend.json'u günceller — bunlar CI
+      # runner'ının geçici dosya sisteminde; commit edilmezse run bitince
+      # kaybolur ve bir sonraki otomatik tetikleme yine "soğuk başlangıç"
+      # olur (hiçbir sayfa "zaten işlendi" görünmez).
+      - name: Commit checkpoint files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          [ -f docs/pdfs/.page_hashes_v1.json ] && git add docs/pdfs/.page_hashes_v1.json
+          [ -f docs/pdfs/.monthly_image_caption_spend.json ] && git add docs/pdfs/.monthly_image_caption_spend.json
+
+          if git diff --staged --quiet; then
+            echo "Checkpoint'te değişiklik yok (ya da dosyalar henüz hiç oluşmadı), commit edilmiyor"
+          else
+            git commit -m "Update image captioning checkpoints (automatic run)"
+            git push
+          fi
+
       - name: Extract Fleet DB from FCOM
         env:
           SPECIFIC_DOC: ${{ github.event.inputs.doc_code }}
