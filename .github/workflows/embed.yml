@@ -1,19 +1,26 @@
 name: Embed Documents
 
 on:
-  # push tetikleyicisi kasıtlı olarak kaldırıldı (2026-09-12): lfs:false
-  # yüzünden checkout sadece LFS pointer dosyalarını çekiyor (gerçek PDF
-  # binary'si değil), ayrıca her push TÜM docs/pdfs/'i (477MB, ~13k FCOM
-  # chunk'ı dahil) yeniden embed ediyor ve eski/güncel-olmayan chunking
-  # mantığı kullanıyor (QRH ident-chunker'ı, Dispatch_Manual özel işlemini
-  # ve FCOM_IMG/FCTM_IMG captioning'i kapsamıyor). Bunlar düzeltilene kadar
-  # sadece manuel workflow_dispatch ile çalıştırılmalı.
+  # push tetikleyicisi 2026-09-19'da, CI yeniden yazımı (detect_changes'in
+  # tüm senaryoları kapsayan doc_codes_to_process çözümlemesi, embed_doc.py
+  # çoklu doc_code desteği, güncel scriptleri çağıran dispatcher, gated
+  # image captioning) tamamlanıp test edildikten sonra yeniden eklendi.
+  # Path filtresi kasıtlı olarak dar (sadece *.pdf/*.PDF): workflow'un
+  # kendi "Commit checkpoint files" adımı docs/pdfs/.page_hashes_v1.json ve
+  # .monthly_image_caption_spend.json'u aynı klasöre push ediyor — daha
+  # geniş bir filtre (örn. docs/pdfs/**) bu commit'lerin workflow'u
+  # kendi kendine yeniden tetiklemesine (sonsuz döngü) yol açardı.
   workflow_dispatch:
     inputs:
       doc_code:
         description: 'Specific doc_code to embed (filename without .pdf, leave empty for all PDFs)'
         required: false
         default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'docs/pdfs/*.pdf'
+      - 'docs/pdfs/*.PDF'
 
 jobs:
   embed:
