@@ -3396,6 +3396,45 @@ async function _getTargetedSearchTerms(query, melContext, apiKey) {
   }
 }
 
+// ===== IMAGE RELEVANCE FILTER =====
+// After the report streams, ask the model which referenced diagrams are actually
+// relevant to what it wrote — avoids showing every image the search happened to return.
+async function _filterRelevantImages(reportText, images){
+  if(!images || images.length === 0) return images;
+  var miniSystem = ('You are reviewing a completed FOR-DEC flight operations report. '
+    + 'Below is the report text, followed by a numbered list of candidate diagrams '
+    + '(each with a source reference and caption). '
+    + 'Identify which diagrams are ACTUALLY relevant to what the report discusses. '
+    + 'Respond ONLY as JSON: {"relevant_indices": [0, 2]}. If none are relevant, return {"relevant_indices": []}.');
+  var miniUser = 'REPORT:\n' + reportText + '\n\nCANDIDATE DIAGRAMS:\n' + images.map(function(img, i){
+    return i + ': [' + (img.source_ref || img.doc_code) + '] ' + (img.content || '');
+  }).join('\n');
+  try {
+    var resp = await fetch('https://cofbackend.vercel.app/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: _aiModelName,
+        max_tokens: 200,
+        system: miniSystem,
+        messages: [{ role: 'user', content: miniUser }]
+      })
+    });
+    if(!resp.ok) return images; // fail-safe: show all on API error
+    var data = await resp.json();
+    var text = (data.content && data.content[0]) ? data.content[0].text : '';
+    text = text.replace(/```json|```/g,'').trim();
+    var parsed = JSON.parse(text);
+    if(!Array.isArray(parsed.relevant_indices)) return images; // fail-safe: malformed response
+    return parsed.relevant_indices
+      .filter(function(i){ return Number.isInteger(i) && i >= 0 && i < images.length; })
+      .map(function(i){ return images[i]; });
+  } catch(e) {
+    console.error('Image relevance filter error:', e);
+    return images; // fail-safe: show all on network/parse error
+  }
+}
+
 // ===== QUERY HISTORY =====
 var _queryHistory = JSON.parse(_ls('get','ai_query_history')||'[]');
 
@@ -3999,26 +4038,29 @@ async function sendQuery() {
     var decoder = new TextDecoder();
     var buf = '';
 
-    function _done(){
+    async function _done(){
       document.getElementById("ai-loading").className = "ai-loading";
       _setSendMode(true);
       // Final render
       document.getElementById("ai-result-body").innerHTML = formatResult(streamedText);
-      // Append referenced diagrams gallery
+      // Append referenced diagrams gallery — filtered to images actually relevant to this report
       if(_imageResults && _imageResults.length > 0){
-        var _gHtml = '<div style="margin-top:18px;border-top:1px solid #E5E5EA;padding-top:12px;">';
-        _gHtml += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">REFERENCED DIAGRAMS</div>';
-        _imageResults.forEach(function(img){
-          var _mt = (img.image_b64.charAt(0) === 'i') ? 'image/png' : 'image/jpeg';
-          _gHtml += '<div style="margin-bottom:14px;">';
-          _gHtml += '<img src="data:'+_mt+';base64,'+img.image_b64+'" style="max-width:100%;border-radius:6px;border:1px solid #E5E5EA;display:block;" />';
-          _gHtml += '<div style="font-size:10px;color:#8E8E93;margin-top:4px;line-height:1.4;">';
-          _gHtml += '<strong>' + (img.source_ref || img.doc_code) + '</strong>';
-          if(img.content) _gHtml += ' — ' + img.content;
-          _gHtml += '</div></div>';
-        });
-        _gHtml += '</div>';
-        document.getElementById("ai-result-body").innerHTML += _gHtml;
+        var _relevantImages = await _filterRelevantImages(streamedText, _imageResults);
+        if(_relevantImages.length > 0){
+          var _gHtml = '<div style="margin-top:18px;border-top:1px solid #E5E5EA;padding-top:12px;">';
+          _gHtml += '<div style="font-size:10px;font-weight:700;color:#8E8E93;letter-spacing:0.6px;text-transform:uppercase;margin-bottom:10px;">REFERENCED DIAGRAMS</div>';
+          _relevantImages.forEach(function(img){
+            var _mt = (img.image_b64.charAt(0) === 'i') ? 'image/png' : 'image/jpeg';
+            _gHtml += '<div style="margin-bottom:14px;">';
+            _gHtml += '<img src="data:'+_mt+';base64,'+img.image_b64+'" style="max-width:100%;border-radius:6px;border:1px solid #E5E5EA;display:block;" />';
+            _gHtml += '<div style="font-size:10px;color:#8E8E93;margin-top:4px;line-height:1.4;">';
+            _gHtml += '<strong>' + (img.source_ref || img.doc_code) + '</strong>';
+            if(img.content) _gHtml += ' — ' + img.content;
+            _gHtml += '</div></div>';
+          });
+          _gHtml += '</div>';
+          document.getElementById("ai-result-body").innerHTML += _gHtml;
+        }
       }
       // Show PDF/Share buttons
       var actEl = document.getElementById("ai-result-actions");
