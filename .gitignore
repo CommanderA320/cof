@@ -1,0 +1,11 @@
+.env
+.env.*
+.envy
+.envy.*
+*.save
+*.backup
+.DS_Store
+graphify-out/
+logs/
+__pycache__/
+*.pyc
