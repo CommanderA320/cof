@@ -38,7 +38,7 @@ git fetch origin && git reset --hard origin/main
 
 ## Qdrant Inventory (Eylül 2026, migration + revizyon sonrası)
 FCOM×12,959 · QRH×834 (THY tail-based format, eski Airbus master'dan değişti)
-MEL×2,569 · AFM×1,978 · FCTM×657 · OM_Part-A×1,213 · OM_Part-B×205
+MEL×2,551 · AFM×1,978 · FCTM×657 · OM_Part-A×1,213 · OM_Part-B×205
 CCM×864 · GOM×1,304 · EASA_Easy_Access_Rules×710
 Dispatch_Manual×199 · LVO×8 · AML×63 · AML_Pages×26 · De-Icing×464
 DGR_Allowed×42 · DGR_Guide×7 · SHT_OPS×760
@@ -93,10 +93,7 @@ checkpoint durumu: FCTM ısıtıldı, FCOM henüz ısıtılmadı.
   .env.*, .envy*, *.save, *.backup — korunuyor).
 
 ## Bilinen Sorunlar (öncelik sırasıyla)
-1. MEL applicability inheritance zayıf — tail-list boilerplate arama skorunu bozuyor;
-   ata_ref payload alanı hiç doldurulmamış (0/36.079 nokta) — planlı çözüm:
-   applicability'yi ayrı payload alanına taşımak
-2. QRH/FCOM'da 4 tescil (TC-LBS, TC-LTZ, TC-LUA, TC-NDF) senkron değil — kabul edilebilir,
+1. QRH/FCOM'da 4 tescil (TC-LBS, TC-LTZ, TC-LUA, TC-NDF) senkron değil — kabul edilebilir,
    iki kaynak dokümanın revizyon farkı
 
 ## Domain Kuralları (Bahadır'ın düzeltmeleri — ground truth)
