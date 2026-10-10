@@ -12,18 +12,13 @@ Tek dosya PWA (index.html). GitHub Pages'te deploy edilir.
     çağrısı YOK.
   - **api/query.js:** Asıl FOR-DEC rapor üretim motoru. Server-side ANTHROPIC_API_KEY ile
     api.anthropic.com/v1/messages'a proxy. Frontend model adını açıkça gönderiyor
-    (varsayılan claude-sonnet-4-6, kullanıcı UI rozetiyle claude-opus-4-6'ya geçebilir).
+    (varsayılan claude-sonnet-5, kullanıcı UI rozetiyle claude-opus-5'e geçebilir).
   - → cofbackend.vercel.app (her ikisi de aynı Vercel deploy'unda)
 - **Vector DB:** Qdrant cloud, cluster "cof2" (free tier) — https://bc42f0d3-c798-4e1a-9a66-a3b45674a4f7.europe-west3-0.gcp.cloud.qdrant.io
   (Not: eski cluster "cof1" Eylül 2026'da disk krizi sonrası silindi, veriler buraya taşındı)
 - **Collection:** documents | payload field: doc_code
-- **FOR-DEC AI Model:** claude-sonnet-4-6 (varsayılan) / claude-opus-4-6 (kullanıcı seçimi) —
-  Sonnet 5'e yükseltme henüz yapılmadı, bekleyen bir karar (image_captioning_rag.py script'i
-  Eylül 2026'da sonnet-5'e geçirildi ama bu SADECE görsel captioning için, FOR-DEC motorunu
-  etkilemez)
+- **FOR-DEC AI Model:** claude-sonnet-5 (medium effort, varsayılan) / claude-opus-5 (kullanıcı seçimi)
 - **Embeddings:** OpenAI text-embedding-3-small
-- **Ölü kod notu:** index.html'de `thy_api_key` (localStorage) tanımlı ve okunuyor ama hiçbir
-  fetch çağrısında kullanılmıyor — muhtemelen eski, artık geçersiz bir BYOK mimarisinden kalıntı
 
 ## Deploy Workflow
 ### Frontend (index.html) — dokümante edilen, hâlâ geçerli akış:
@@ -67,10 +62,17 @@ Yeni bir doc_code (yeni doküman türü) eklendiyse SOURCE_LIMITS'e de eklenmeli
 embed olur ama aranamaz.
 
 ## CI Durumu (embed.yml)
-Push tetikleyicisi Eylül 2026'da DEVRE DIŞI bırakıldı (sadece workflow_dispatch).
-Sebep: lfs:false yüzünden çalışmıyordu VE gömülü chunking mantığı güncel değil
-(qrh_chunker_ident.py'yi, Dispatch_Manual özel işlemesini, görsel captioning'i
-yansıtmıyor). Yeniden açmak ayrı, kapsamlı bir iş — şimdilik tüm embed işlemleri elle.
+Push tetikleyicisi yeniden açık — sadece `docs/pdfs/*.pdf` ve `docs/pdfs/*.PDF` değişikliklerine
+sınırlı. Gömülü chunking mantığının kapsamlı yeniden yazımı (a)-(d) tamamlandı
+(qrh_chunker_ident.py, Dispatch_Manual özel işlemesi, görsel captioning dahil).
+
+## scripts/watch_and_push.py
+launchd ile sadece iMac'te çalışıyor (otomatik PDF değişikliği push'u). MacBook'ta
+çalıştırılmamalı — iki makinede aynı anda çalışırsa çakışma riski var.
+
+## caption-images.yml
+Elle tetiklenen (workflow_dispatch), `confirm=YES` gerektiren bir workflow. Hash
+checkpoint durumu: FCTM ısıtıldı, FCOM henüz ısıtılmadı.
 
 ## Kritik Geliştirme Kuralları
 - **HTML editing:** grep ile satır numarası bul, doğrudan hedefle. Python regex ile HTML
@@ -87,18 +89,15 @@ yansıtmıyor). Yeniden açmak ayrı, kapsamlı bir iş — şimdilik tüm embed
   — durup dokümantasyona bak ya da destek talebi aç.
 - **Güvenlik:** API key'ler asla frontend'e (index.html) veya git geçmişine gömülmez,
   sadece .env / Vercel env üzerinden okunur (Eylül 2026'da denetlendi, temiz).
+- **.gitignore:** cof ve cofbackend repolarında artık commit'li (env varyantları —
+  .env.*, .envy*, *.save, *.backup — korunuyor).
 
 ## Bilinen Sorunlar (öncelik sırasıyla)
-1. CI otomasyonu kapsamlı yeniden yazım bekliyor (yukarıya bakın)
-2. MEL applicability inheritance zayıf — tail-list boilerplate arama skorunu bozuyor;
+1. MEL applicability inheritance zayıf — tail-list boilerplate arama skorunu bozuyor;
    ata_ref payload alanı hiç doldurulmamış (0/36.079 nokta) — planlı çözüm:
    applicability'yi ayrı payload alanına taşımak
-3. QRH/FCOM'da 4 tescil (TC-LBS, TC-LTZ, TC-LUA, TC-NDF) senkron değil — kabul edilebilir,
+2. QRH/FCOM'da 4 tescil (TC-LBS, TC-LTZ, TC-LUA, TC-NDF) senkron değil — kabul edilebilir,
    iki kaynak dokümanın revizyon farkı
-4. FOR-DEC motorunda (query.js) hâlâ sonnet-4-6 — sonnet-5'e geçiş bekleyen bir karar
-5. index.html'de ölü kod: thy_api_key tanımlı ama kullanılmıyor — temizlenebilir
-6. index.html'de hem client-side hem (artık) server-side logo/duplicate-image filtresi
-   var — iki katmanın ikisinin de gerekip gerekmediği incelenmedi
 
 ## Domain Kuralları (Bahadır'ın düzeltmeleri — ground truth)
 - FCOM PRO-ABN hem abnormal hem emergency prosedürlerini içerir — ayrım YOK
