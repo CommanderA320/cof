@@ -769,80 +769,6 @@ function _docAvailable(docCode){
   try{ return (localStorage.getItem('doc_text_'+docCode)||'').length > 100; }catch(e){ return false; }
 }
 
-// Preload all docs from GitHub into memory cache
-var _preloadDone = true;
-function _preloadDocs(onStatus, onDone){
-  var codes = REFERENCES.map(function(r){return r.code;});
-
-  // Evict any cached doc that has no SHA — these are pre-SHA legacy entries.
-  // They will be re-fetched and get a SHA stored, so this only triggers once per device.
-  codes.forEach(function(code){
-    try{
-      var cached = localStorage.getItem('doc_text_'+code) || '';
-      var sha = localStorage.getItem('doc_sha_'+code) || '';
-      if(cached.length > 100 && !sha){
-        localStorage.removeItem('doc_text_'+code);
-        delete _docCache[code];
-      }
-    }catch(e){}
-  });
-
-  // Fetch GitHub docs/ directory listing for SHA comparison (no token needed)
-  var dirUrl = 'https://api.github.com/repos/'+GITHUB_OWNER+'/'+GITHUB_REPO+'/contents/docs/';
-  var dirHdr = {'Accept':'application/vnd.github.v3+json'};
-  var tok = _ghToken(); if(tok) dirHdr['Authorization'] = 'token '+tok;
-  fetch(dirUrl, {headers:dirHdr, cache:'no-store'})
-  .then(function(r){ return r.ok ? r.json() : null; })
-  .catch(function(){ return null; })
-  .then(function(dirListing){
-    var ghSHA = {};
-    if(Array.isArray(dirListing)){
-      dirListing.forEach(function(f){ ghSHA[f.name] = f.sha; });
-    }
-    // Evict where local SHA != GitHub SHA
-    codes.forEach(function(code){
-      var fname = _ghDocsPath(code).split('/').pop();
-      var remoteSHA = ghSHA[fname];
-      if(!remoteSHA) return;
-      try{
-        var localSHA = localStorage.getItem('doc_sha_'+code) || '';
-        if(localSHA && localSHA !== remoteSHA){
-          localStorage.removeItem('doc_text_'+code);
-          localStorage.removeItem('doc_sha_'+code);
-          delete _docCache[code];
-        }
-      }catch(e){}
-    });
-    // Load loop
-    var i = 0;
-    function next(){
-      if(i >= codes.length){ _preloadDone = true; onDone && onDone(); return; }
-      var code = codes[i++];
-      if(_docCache[code]){ next(); return; }
-      try{
-        var cached = localStorage.getItem('doc_text_'+code) || sessionStorage.getItem('doc_text_'+code) || '';
-        if(cached.length > 100){
-          _docCache[code] = cached;
-          onStatus && onStatus('✅ Önbellekten: '+code+' ('+i+'/'+codes.length+')');
-          setTimeout(next, 10);
-          return;
-        }
-      }catch(e){}
-      onStatus && onStatus('⏳ GitHubdan: '+code+' ('+i+'/'+codes.length+')');
-      var _fname = _ghDocsPath(code).split('/').pop();
-      var _sha = ghSHA[_fname] || '';
-      var _code = code;
-      _loadDocFromGitHub(_code, function(err, text){
-        if(!err && text && text.length > 100 && _sha){
-          try{ localStorage.setItem('doc_sha_'+_code, _sha); }catch(e){}
-        }
-        setTimeout(next, 80);
-      });
-    }
-    next();
-  });
-}
-
 function _renderDocManager(){
   var body = document.getElementById('edit-body');
   body.innerHTML = '';
@@ -3350,8 +3276,8 @@ function formatResult(text) {
 
 // ===== TWO-STEP RETRIEVAL =====
 // Step 1: Ask model which procedures/sections to look up
-// Step 2: Run targeted BM25 searches for those specific items
-// This solves compound MEL+ECAM scenarios where BM25 keyword match fails
+// Step 2: Run targeted semantic (Qdrant) searches for those specific items
+// This solves compound MEL+ECAM scenarios where a single query's top-K misses them
 
 async function _getTargetedSearchTerms(query, melContext, apiKey) {
   // Quick system prompt — just needs to identify what to look up
@@ -3639,12 +3565,9 @@ async function sendQuery() {
   var hisEl=document.getElementById("ai-history"); if(hisEl) hisEl.style.display="none";
   _setSendMode(false);
 
-  // Loaded docs list
-  var loadedDocs = REFERENCES.filter(function(r){
-    return _docAvailable(r.code);
-  }).map(function(r){return r.code;});
+  // Subtitle shows live search progress — not stale client-side doc-cache state
   var subEl = document.getElementById('ai-loading-sub');
-  if(subEl) subEl.textContent = loadedDocs.length ? loadedDocs.slice(0,5).join(' | ')+(loadedDocs.length>5?' +'+( loadedDocs.length-5):'') : 'Base knowledge only';
+  if(subEl) subEl.textContent = 'Searching sources...';
 
   setTimeout(function() {
     document.getElementById("ai-loading").scrollIntoView({behavior:"smooth", block:"center"});
@@ -3653,7 +3576,7 @@ async function sendQuery() {
   var t = utcNow();
   var apiKey = 'backend'; // API key is handled by the backend
 
-  // BM25: pick most relevant chunks from loaded docs (skip for offline procedure mode)
+  // Semantic search: pick most relevant chunks from Qdrant (skip for offline procedure mode)
   var docContext = '';
   var melContext = '';
   var _imageResults = [];
@@ -3673,7 +3596,7 @@ async function sendQuery() {
     msnData = _getMSNForReg(registration);
     setTimeout(_updateRegBadge, 100);
   }
-  // Fallback: if still no MSN, use Fleet DB type for BM25 filter
+  // Fallback: if still no MSN, use Fleet DB type for the search query
   if(!msnData && acInfo){
     var typeNum = acInfo.type.replace(/[^0-9]/g,'').substring(0,3); // "A321neo"→"321"
     msnData = {msn: null, model: typeNum || null};
@@ -3689,6 +3612,14 @@ async function sendQuery() {
     });
     var searchData = await searchRes.json();
     if(searchData.results && searchData.results.length > 0){
+      // Update loading subtitle with the doc_codes the search actually found
+      if(subEl){
+        var _foundDocs = [];
+        searchData.results.forEach(function(r){
+          if(r.doc_code && _foundDocs.indexOf(r.doc_code) === -1) _foundDocs.push(r.doc_code);
+        });
+        subEl.textContent = _foundDocs.slice(0,5).join(' | ')+(_foundDocs.length>5?' +'+(_foundDocs.length-5):'');
+      }
       // Group by doc, build context string; separate image results for vision
       var byDoc = {};
       searchData.results.forEach(function(r){
